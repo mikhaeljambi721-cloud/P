@@ -1,0 +1,750 @@
+--[[
+    DELTA MENU v2.0 + NOCLIP
+    Load: loadstring(game:HttpGet("https://raw.githubusercontent.com/USERNAME/REPO/main/DeltaMenu.lua"))()
+]]
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local LocalPlayer = Players.LocalPlayer
+
+if game.CoreGui:FindFirstChild("DeltaMenu") then
+    game.CoreGui.DeltaMenu:Destroy()
+end
+
+local State = {
+    Speed = false, Jump = false, Fly = false, ESP = false,
+    Aimbot = false, InfiniteJump = false, Noclip = false,
+    Fullbright = false, Gravity = false,
+}
+
+-- ===== NOCLIP SYSTEM (dioptimalkan) =====
+local NoclipConnection = nil
+local NoclipThread = nil
+
+local function enableNoclip()
+    if NoclipConnection then NoclipConnection:Disconnect() end
+    if NoclipThread then task.cancel(NoclipThread) end
+    
+    NoclipThread = task.spawn(function()
+        while State.Noclip do
+            local char = LocalPlayer.Character
+            if char then
+                for _, part in pairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") and part.CanCollide then
+                        part.CanCollide = false
+                    end
+                end
+            end
+            task.wait(0.1)
+        end
+        -- Restore collision saat dimatikan
+        local char = LocalPlayer.Character
+        if char then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
+    end)
+
+    -- Handle respawn
+    if NoclipConnection then NoclipConnection:Disconnect() end
+    NoclipConnection = LocalPlayer.CharacterAdded:Connect(function(char)
+        task.wait(1)
+        if State.Noclip then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end)
+end
+
+local function disableNoclip()
+    if NoclipConnection then NoclipConnection:Disconnect(); NoclipConnection = nil end
+    local char = LocalPlayer.Character
+    if char then
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+end
+
+-- ===== GUI =====
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DeltaMenu"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.Parent = game.CoreGui
+
+local ToggleBtn = Instance.new("TextButton")
+ToggleBtn.Size = UDim2.new(0, 50, 0, 50)
+ToggleBtn.Position = UDim2.new(0, 20, 0.5, -25)
+ToggleBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+ToggleBtn.Text = "Δ"
+ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleBtn.TextSize = 26
+ToggleBtn.Font = Enum.Font.GothamBold
+ToggleBtn.BorderSizePixel = 0
+ToggleBtn.Active = true
+ToggleBtn.Draggable = true
+ToggleBtn.Parent = ScreenGui
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(1, 0)
+ToggleCorner.Parent = ToggleBtn
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 550, 0, 360)
+MainFrame.Position = UDim2.new(0.5, -275, 0.5, -180)
+MainFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local MFCorner = Instance.new("UICorner")
+MFCorner.CornerRadius = UDim.new(0, 10)
+MFCorner.Parent = MainFrame
+
+local MFStroke = Instance.new("UIStroke")
+MFStroke.Color = Color3.fromRGB(88, 101, 242)
+MFStroke.Thickness = 1.5
+MFStroke.Transparency = 0.3
+MFStroke.Parent = MainFrame
+
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 38)
+TopBar.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = MainFrame
+
+local TBCorner = Instance.new("UICorner")
+TBCorner.CornerRadius = UDim.new(0, 10)
+TBCorner.Parent = TopBar
+
+local TBFix = Instance.new("Frame")
+TBFix.Size = UDim2.new(1, 0, 0, 15)
+TBFix.Position = UDim2.new(0, 0, 1, -15)
+TBFix.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+TBFix.BorderSizePixel = 0
+TBFix.Parent = TopBar
+
+local Logo = Instance.new("TextLabel")
+Logo.Size = UDim2.new(0, 30, 1, 0)
+Logo.Position = UDim2.new(0, 8, 0, 0)
+Logo.BackgroundTransparency = 1
+Logo.Text = "Δ"
+Logo.TextColor3 = Color3.fromRGB(88, 101, 242)
+Logo.TextSize = 22
+Logo.Font = Enum.Font.GothamBold
+Logo.Parent = TopBar
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -80, 1, 0)
+Title.Position = UDim2.new(0, 40, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Delta Menu  |  v2.0"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 16
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TopBar
+
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Size = UDim2.new(0, 26, 0, 26)
+MinimizeBtn.Position = UDim2.new(1, -60, 0, 6)
+MinimizeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+MinimizeBtn.Text = "—"
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeBtn.TextSize = 14
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.BorderSizePixel = 0
+MinimizeBtn.Parent = TopBar
+
+local MinCorner = Instance.new("UICorner")
+MinCorner.CornerRadius = UDim.new(0, 6)
+MinCorner.Parent = MinimizeBtn
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 26, 0, 26)
+CloseBtn.Position = UDim2.new(1, -30, 0, 6)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 60)
+CloseBtn.Text = "✕"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.TextSize = 12
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.BorderSizePixel = 0
+CloseBtn.Parent = TopBar
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 6)
+CloseCorner.Parent = CloseBtn
+
+local TabContainer = Instance.new("Frame")
+TabContainer.Size = UDim2.new(0, 130, 1, -50)
+TabContainer.Position = UDim2.new(0, 10, 0, 45)
+TabContainer.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+TabContainer.BorderSizePixel = 0
+TabContainer.Parent = MainFrame
+
+local TabCCorner = Instance.new("UICorner")
+TabCCorner.CornerRadius = UDim.new(0, 8)
+TabCCorner.Parent = TabContainer
+
+local TabList = Instance.new("UIListLayout")
+TabList.Padding = UDim.new(0, 5)
+TabList.SortOrder = Enum.SortOrder.LayoutOrder
+TabList.Parent = TabContainer
+
+local TabPad = Instance.new("UIPadding")
+TabPad.PaddingTop = UDim.new(0, 8)
+TabPad.PaddingLeft = UDim.new(0, 8)
+TabPad.PaddingRight = UDim.new(0, 8)
+TabPad.Parent = TabContainer
+
+local ContentContainer = Instance.new("Frame")
+ContentContainer.Size = UDim2.new(1, -160, 1, -55)
+ContentContainer.Position = UDim2.new(0, 150, 0, 45)
+ContentContainer.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+ContentContainer.BorderSizePixel = 0
+ContentContainer.Parent = MainFrame
+
+local CCCorner = Instance.new("UICorner")
+CCCorner.CornerRadius = UDim.new(0, 8)
+CCCorner.Parent = ContentContainer
+
+-- ===== BUILDERS =====
+local Pages = {}
+local TabButtons = {}
+
+local function createTab(name)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 34)
+    btn.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+    btn.Text = "  " .. name
+    btn.TextColor3 = Color3.fromRGB(200, 200, 210)
+    btn.TextSize = 14
+    btn.Font = Enum.Font.GothamMedium
+    btn.BorderSizePixel = 0
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    btn.AutoButtonColor = false
+    btn.Parent = TabContainer
+
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6)
+    c.Parent = btn
+
+    local page = Instance.new("ScrollingFrame")
+    page.Size = UDim2.new(1, 0, 1, 0)
+    page.BackgroundTransparency = 1
+    page.BorderSizePixel = 0
+    page.ScrollBarThickness = 4
+    page.ScrollBarImageColor3 = Color3.fromRGB(88, 101, 242)
+    page.CanvasSize = UDim2.new(0, 0, 0, 0)
+    page.Visible = false
+    page.Parent = ContentContainer
+
+    local pageList = Instance.new("UIListLayout")
+    pageList.Padding = UDim.new(0, 8)
+    pageList.SortOrder = Enum.SortOrder.LayoutOrder
+    pageList.Parent = page
+
+    local pagePad = Instance.new("UIPadding")
+    pagePad.PaddingTop = UDim.new(0, 10)
+    pagePad.PaddingLeft = UDim.new(0, 10)
+    pagePad.PaddingRight = UDim.new(0, 10)
+    pagePad.PaddingBottom = UDim.new(0, 10)
+    pagePad.Parent = page
+
+    pageList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        page.CanvasSize = UDim2.new(0, 0, 0, pageList.AbsoluteContentSize.Y + 20)
+    end)
+
+    Pages[name] = page
+    table.insert(TabButtons, {Btn = btn, Name = name})
+
+    btn.MouseButton1Click:Connect(function()
+        for _, p in pairs(Pages) do p.Visible = false end
+        for _, tb in pairs(TabButtons) do
+            TweenService:Create(tb.Btn, TweenInfo.new(0.15), {
+                BackgroundColor3 = Color3.fromRGB(28, 28, 35),
+                TextColor3 = Color3.fromRGB(200, 200, 210)
+            }):Play()
+        end
+        page.Visible = true
+        TweenService:Create(btn, TweenInfo.new(0.15), {
+            BackgroundColor3 = Color3.fromRGB(88, 101, 242),
+            TextColor3 = Color3.fromRGB(255, 255, 255)
+        }):Play()
+    end)
+
+    return page
+end
+
+local function createButton(parent, text, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 36)
+    btn.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(230, 230, 240)
+    btn.TextSize = 14
+    btn.Font = Enum.Font.GothamMedium
+    btn.BorderSizePixel = 0
+    btn.AutoButtonColor = false
+    btn.Parent = parent
+
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6)
+    c.Parent = btn
+
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(45, 45, 55)}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(28, 28, 35)}):Play()
+    end)
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+local function createToggle(parent, text, default, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 36)
+    frame.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+    frame.BorderSizePixel = 0
+    frame.Parent = parent
+
+    local fc = Instance.new("UICorner")
+    fc.CornerRadius = UDim.new(0, 6)
+    fc.Parent = frame
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -70, 1, 0)
+    label.Position = UDim2.new(0, 12, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(230, 230, 240)
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamMedium
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+
+    local toggle = Instance.new("TextButton")
+    toggle.Size = UDim2.new(0, 46, 0, 22)
+    toggle.Position = UDim2.new(1, -58, 0.5, -11)
+    toggle.BackgroundColor3 = default and Color3.fromRGB(88, 101, 242) or Color3.fromRGB(60, 60, 70)
+    toggle.Text = ""
+    toggle.BorderSizePixel = 0
+    toggle.AutoButtonColor = false
+    toggle.Parent = frame
+
+    local tc = Instance.new("UICorner")
+    tc.CornerRadius = UDim.new(1, 0)
+    tc.Parent = toggle
+
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 18, 0, 18)
+    knob.Position = default and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
+    knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    knob.BorderSizePixel = 0
+    knob.Parent = toggle
+
+    local kc = Instance.new("UICorner")
+    kc.CornerRadius = UDim.new(1, 0)
+    kc.Parent = knob
+
+    local enabled = default
+    local function setState(state)
+        enabled = state
+        TweenService:Create(toggle, TweenInfo.new(0.2), {
+            BackgroundColor3 = enabled and Color3.fromRGB(88, 101, 242) or Color3.fromRGB(60, 60, 70)
+        }):Play()
+        TweenService:Create(knob, TweenInfo.new(0.2), {
+            Position = enabled and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
+        }):Play()
+        if callback then callback(enabled) end
+    end
+
+    toggle.MouseButton1Click:Connect(function() setState(not enabled) end)
+    if default and callback then callback(true) end
+
+    return {Frame = frame, Set = setState}
+end
+
+local function createLabel(parent, text)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 24)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(88, 101, 242)
+    label.TextSize = 13
+    label.Font = Enum.Font.GothamBold
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = parent
+    return label
+end
+
+-- ===== TABS =====
+local MainPage = createTab("Main")
+local PlayerPage = createTab("Player")
+local VisualPage = createTab("Visual")
+local MiscPage = createTab("Misc")
+
+TabButtons[1].Btn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+TabButtons[1].Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MainPage.Visible = true
+
+-- ===== HELPERS =====
+local function getHum()
+    local char = LocalPlayer.Character
+    return char and char:FindFirstChildOfClass("Humanoid")
+end
+local function getHRP()
+    local char = LocalPlayer.Character
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+-- ===== MAIN TAB =====
+createLabel(MainPage, "— Movement —")
+
+createToggle(MainPage, "Speed Boost (x3)", false, function(state)
+    State.Speed = state
+    task.spawn(function()
+        while State.Speed do
+            local hum = getHum()
+            if hum then hum.WalkSpeed = 48 end
+            task.wait(0.3)
+        end
+        local hum = getHum()
+        if hum then hum.WalkSpeed = 16 end
+    end)
+end)
+
+createToggle(MainPage, "Jump Boost", false, function(state)
+    State.Jump = state
+    task.spawn(function()
+        while State.Jump do
+            local hum = getHum()
+            if hum then hum.JumpPower = 100; hum.UseJumpPower = true end
+            task.wait(0.3)
+        end
+        local hum = getHum()
+        if hum then hum.JumpPower = 50 end
+    end)
+end)
+
+createToggle(MainPage, "Infinite Jump", false, function(state)
+    State.InfiniteJump = state
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    if State.InfiniteJump then
+        local hum = getHum()
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end
+end)
+
+createToggle(MainPage, "Fly", false, function(state)
+    State.Fly = state
+    if state then
+        local hrp = getHRP()
+        if not hrp then return end
+
+        local bg = Instance.new("BodyGyro")
+        bg.P = 9e4
+        bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+        bg.CFrame = hrp.CFrame
+        bg.Name = "DeltaFlyGyro"
+        bg.Parent = hrp
+
+        local bv = Instance.new("BodyVelocity")
+        bv.Velocity = Vector3.new(0, 0, 0)
+        bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        bv.Name = "DeltaFlyVel"
+        bv.Parent = hrp
+
+        task.spawn(function()
+            while State.Fly and hrp.Parent do
+                local cam = workspace.CurrentCamera
+                local move = Vector3.new(0, 0, 0)
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then move = move + cam.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then move = move - cam.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then move = move - cam.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then move = move + cam.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0, 1, 0) end
+                if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move = move - Vector3.new(0, 1, 0) end
+                bv.Velocity = move.Magnitude > 0 and move.Unit * 60 or Vector3.new(0, 0, 0)
+                bg.CFrame = cam.CFrame
+                task.wait()
+            end
+        end)
+    else
+        local hrp = getHRP()
+        if hrp then
+            if hrp:FindFirstChild("DeltaFlyGyro") then hrp.DeltaFlyGyro:Destroy() end
+            if hrp:FindFirstChild("DeltaFlyVel") then hrp.DeltaFlyVel:Destroy() end
+        end
+    end
+end)
+
+-- ✅ NOCLIP (Tembus Dinding) - sudah dioptimalkan
+createToggle(MainPage, "Noclip (Tembus Dinding)", false, function(state)
+    State.Noclip = state
+    if state then
+        enableNoclip()
+    else
+        disableNoclip()
+    end
+end)
+
+-- ===== PLAYER TAB =====
+createLabel(PlayerPage, "— Character —")
+
+createButton(PlayerPage, "Heal (Full HP)", function()
+    local hum = getHum()
+    if hum then hum.Health = hum.MaxHealth end
+end)
+
+createToggle(PlayerPage, "God Mode", false, function(state)
+    task.spawn(function()
+        while state do
+            local hum = getHum()
+            if hum then hum.MaxHealth = math.huge; hum.Health = math.huge end
+            task.wait(0.3)
+        end
+    end)
+end)
+
+createButton(PlayerPage, "Reset Character", function()
+    local hum = getHum()
+    if hum then hum.Health = 0 end
+end)
+
+createLabel(PlayerPage, "— Combat —")
+
+createToggle(PlayerPage, "Aimbot (hold Right Mouse)", false, function(state)
+    State.Aimbot = state
+    if state then
+        task.spawn(function()
+            while State.Aimbot do
+                if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+                    local cam = workspace.CurrentCamera
+                    local closest, dist = nil, math.huge
+                    for _, plr in pairs(Players:GetPlayers()) do
+                        if plr ~= LocalPlayer and plr.Character then
+                            local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+                            local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+                            if hrp and hum and hum.Health > 0 then
+                                local screenPos, onScreen = cam:WorldToViewportPoint(hrp.Position)
+                                local mousePos = UserInputService:GetMouseLocation()
+                                local d = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                                if onScreen and d < dist and d < 200 then
+                                    closest, dist = hrp, d
+                                end
+                            end
+                        end
+                    end
+                    if closest then
+                        cam.CFrame = CFrame.new(cam.CFrame.Position, closest.Position)
+                    end
+                end
+                task.wait()
+            end
+        end)
+    end
+end)
+
+-- ===== VISUAL TAB =====
+createLabel(VisualPage, "— ESP —")
+
+local ESPFolder = Instance.new("Folder")
+ESPFolder.Name = "DeltaESP"
+ESPFolder.Parent = game.CoreGui
+
+local function createESP(plr)
+    if plr == LocalPlayer then return end
+    if ESPFolder:FindFirstChild(plr.Name .. "_ESP") then return end
+
+    local box = Instance.new("BoxHandleAdornment")
+    box.Name = plr.Name .. "_ESP"
+    box.AlwaysOnTop = true
+    box.ZIndex = 5
+    box.Size = Vector3.new(2, 5, 2)
+    box.Transparency = 0.5
+    box.Color3 = Color3.fromRGB(255, 60, 60)
+    box.Parent = ESPFolder
+
+    local nameTag = Instance.new("BillboardGui")
+    nameTag.Name = plr.Name .. "_Name"
+    nameTag.Size = UDim2.new(0, 100, 0, 20)
+    nameTag.StudsOffset = Vector3.new(0, 3, 0)
+    nameTag.AlwaysOnTop = true
+    nameTag.Parent = ESPFolder
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 1, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = plr.Name
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameLabel.TextStrokeTransparency = 0
+    nameLabel.TextSize = 12
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.Parent = nameTag
+
+    local function update()
+        local char = plr.Character
+        if char then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hrp then
+                box.Adornee = hrp
+                nameTag.Adornee = hrp
+                if hum then
+                    local hpRatio = hum.Health / hum.MaxHealth
+                    box.Color3 = Color3.fromRGB(255 * (1 - hpRatio), 255 * hpRatio, 0)
+                end
+            else
+                box.Adornee = nil
+                nameTag.Adornee = nil
+            end
+        else
+            box.Adornee = nil
+            nameTag.Adornee = nil
+        end
+    end
+
+    update()
+    plr.CharacterAdded:Connect(update)
+    task.spawn(function()
+        while box.Parent do update(); task.wait(0.1) end
+    end)
+end
+
+createToggle(VisualPage, "ESP Player", false, function(state)
+    State.ESP = state
+    if state then
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer then createESP(plr) end
+        end
+        Players.PlayerAdded:Connect(function(plr)
+            if State.ESP then
+                plr.CharacterAdded:Wait()
+                task.wait(0.5)
+                createESP(plr)
+            end
+        end)
+    else
+        ESPFolder:ClearAllChildren()
+    end
+end)
+
+createToggle(VisualPage, "Fullbright", false, function(state)
+    State.Fullbright = state
+    if state then
+        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+        Lighting.Brightness = 3
+        Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+        Lighting.GlobalShadows = false
+    else
+        Lighting.Ambient = Color3.fromRGB(70, 70, 70)
+        Lighting.Brightness = 2
+        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        Lighting.GlobalShadows = true
+    end
+end)
+
+createToggle(VisualPage, "Low Gravity", false, function(state)
+    State.Gravity = state
+    workspace.Gravity = state and 50 or 196.2
+end)
+
+-- ===== MISC TAB =====
+createLabel(MiscPage, "— Teleport —")
+
+createButton(MiscPage, "Teleport ke Spawn", function()
+    local hrp = getHRP()
+    if hrp then hrp.CFrame = CFrame.new(0, 50, 0) end
+end)
+
+createButton(MiscPage, "Teleport ke Player Terdekat", function()
+    local hrp = getHRP()
+    if not hrp then return end
+    local closest, dist = nil, math.huge
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            local phrp = plr.Character:FindFirstChild("HumanoidRootPart")
+            if phrp then
+                local d = (hrp.Position - phrp.Position).Magnitude
+                if d < dist then closest, dist = phrp, d end
+            end
+        end
+    end
+    if closest then hrp.CFrame = closest.CFrame + Vector3.new(0, 3, 0) end
+end)
+
+createButton(MiscPage, "Copy Posisi ke Clipboard", function()
+    local hrp = getHRP()
+    if hrp and setclipboard then
+        setclipboard(tostring(hrp.Position))
+    end
+end)
+
+createLabel(MiscPage, "— Server —")
+
+createButton(MiscPage, "Rejoin Server", function()
+    game:GetService("TeleportService"):Teleport(game.PlaceId, LocalPlayer)
+end)
+
+createLabel(MiscPage, "— Lainnya —")
+
+createButton(MiscPage, "Destroy GUI", function()
+    State.Noclip = false
+    disableNoclip()
+    ScreenGui:Destroy()
+    ESPFolder:Destroy()
+end)
+
+-- ===== CONTROLS =====
+ToggleBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
+
+local minimized = false
+MinimizeBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    TweenService:Create(MainFrame, TweenInfo.new(0.2), {
+        Size = minimized and UDim2.new(0, 550, 0, 38) or UDim2.new(0, 550, 0, 360)
+    }):Play()
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+    MainFrame.Visible = false
+end)
+
+-- ===== KEYBIND NOCLIP (Tombol N) =====
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.N then
+        State.Noclip = not State.Noclip
+        if State.Noclip then
+            enableNoclip()
+            print("✅ Noclip: ON")
+        else
+            disableNoclip()
+            print("❌ Noclip: OFF")
+        end
+    end
+end)
+
+print("✅ Delta Menu v2.0 + Noclip Loaded!")
+print("💡 Tips: Tekan tombol [N] untuk toggle Noclip cepat")
