@@ -1,0 +1,383 @@
+-- ============================================
+--  🥚 SOUGPT AUTO-STEAL — Steal an Egg
+--  "Dibuat dari nol untuk Tuanku Xso"
+--  Delta Executor Optimized
+-- ============================================
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+-- ============================================
+--  ⚙️ KONFIGURASI
+-- ============================================
+
+getgenv().SouGPT_Config = {
+    AutoSteal = true,
+    StealRange = 15,          -- jarak deteksi egg (stud)
+    StealDelay = 0.3,         -- delay antar steal (detik)
+    AutoPlace = true,         -- auto taruh egg di base
+    AutoHatch = true,         -- auto hatch egg
+    ESP = false,              -- tampilkan egg lewat dinding
+    ESPColor = Color3.fromRGB(255, 200, 0),
+    Notify = true,            -- notifikasi saat berhasil
+}
+
+-- ============================================
+--  📦 SERVICE & VARIABEL
+-- ============================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ProximityPromptService = game:GetService("ProximityPromptService")
+local TweenService = game:GetService("TweenService")
+local LP = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- Drawing library (Delta)
+local Drawing = Drawing or debug.getupvalue(getrenv().Drawing, 1) or Drawing
+
+-- State
+local isStealing = false
+local lastSteal = 0
+local stolenEggs = 0
+
+-- ============================================
+--  🔍 FUNGSI DETEKSI EGG
+-- ============================================
+
+-- Cari semua ProximityPrompt yang berkaitan dengan egg
+local function GetAllEggPrompts()
+    local prompts = {}
+    
+    -- Scan workspace secara rekursif
+    local function scan(obj)
+        if obj:IsA("ProximityPrompt") then
+            local action = obj.ActionText:lower()
+            local object = obj.ObjectText:lower()
+            
+            -- Filter: prompt yang berkaitan dengan egg
+            if action:find("steal") or action:find("egg") or 
+               action:find("take") or object:find("egg") then
+                table.insert(prompts, obj)
+            end
+        end
+        
+        for _, child in ipairs(obj:GetChildren()) do
+            scan(child)
+        end
+    end
+    
+    scan(workspace)
+    return prompts
+end
+
+-- Cari prompt egg terdekat dari player
+local function GetClosestEggPrompt()
+    local closest = nil
+    local shortest = SouGPT_Config.StealRange
+    
+    local char = LP.Character
+    if not char then return nil end
+    
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    
+    local prompts = GetAllEggPrompts()
+    
+    for _, prompt in ipairs(prompts) do
+        local part = prompt.Parent
+        if not part or not part:IsA("BasePart") then continue end
+        
+        local dist = (part.Position - root.Position).Magnitude
+        if dist < shortest then
+            shortest = dist
+            closest = prompt
+        end
+    end
+    
+    return closest
+end
+
+-- ============================================
+--  🎯 AUTO STEAL ENGINE
+-- ============================================
+
+local function StealEgg(prompt)
+    if not prompt then return false end
+    
+    local now = tick()
+    if now - lastSteal < SouGPT_Config.StealDelay then return false end
+    lastSteal = now
+    
+    -- Trigger prompt
+    local success, err = pcall(function()
+        prompt:InputHoldBegin()
+        task.wait(prompt.HoldDuration or 0.1)
+        prompt:InputHoldEnd()
+    end)
+    
+    if success then
+        stolenEggs = stolenEggs + 1
+        if SouGPT_Config.Notify then
+            print(string.format("[🥚 SouGPT] Berhasil steal egg! Total: %d", stolenEggs))
+        end
+        return true
+    else
+        -- Fallback: coba fire remote event
+        pcall(function()
+            local remote = prompt:FindFirstChildOfClass("RemoteEvent")
+            if remote then
+                remote:FireServer()
+            end
+        end)
+    end
+    
+    return false
+end
+
+-- ============================================
+--  🏠 AUTO PLACE & AUTO HATCH
+-- ============================================
+
+-- Cari prompt untuk place egg di base
+local function GetPlacePrompt()
+    local char = LP.Character
+    if not char then return nil end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    
+    -- Cari prompt yang berkaitan dengan place/pen/incubator
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") then
+            local action = obj.ActionText:lower()
+            local object = obj.ObjectText:lower()
+            
+            if action:find("place") or action:find("hatch") or 
+               action:find("incubat") or object:find("pen") or
+               object:find("nest") then
+                local part = obj.Parent
+                if part and part:IsA("BasePart") then
+                    local dist = (part.Position - root.Position).Magnitude
+                    if dist < 20 then
+                        return obj
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function AutoPlaceAndHatch()
+    if not SouGPT_Config.AutoPlace and not SouGPT_Config.AutoHatch then return end
+    
+    local placePrompt = GetPlacePrompt()
+    if placePrompt then
+        pcall(function()
+            placePrompt:InputHoldBegin()
+            task.wait(0.1)
+            placePrompt:InputHoldEnd()
+        end)
+    end
+end
+
+-- ============================================
+--  👁️ ESP UNTUK EGG (Opsional)
+-- ============================================
+
+local ESPObjects = {}
+
+local function CreateEggESP(part)
+    if ESPObjects[part] then return end
+    if not Drawing then return end
+    
+    local box = Drawing.new("Box")
+    box.Thickness = 1.5
+    box.Color = SouGPT_Config.ESPColor
+    box.Filled = false
+    box.Transparency = 0.6
+    
+    local text = Drawing.new("Text")
+    text.Size = 14
+    text.Color = Color3.fromRGB(255, 255, 255)
+    text.Center = true
+    text.Outline = true
+    text.OutlineColor = Color3.fromRGB(0, 0, 0)
+    
+    ESPObjects[part] = {box = box, text = text}
+end
+
+local function UpdateEggESP()
+    if not SouGPT_Config.ESP or not Drawing then
+        -- Sembunyikan semua
+        for _, esp in pairs(ESPObjects) do
+            esp.box.Visible = false
+            esp.text.Visible = false
+        end
+        return
+    end
+    
+    local prompts = GetAllEggPrompts()
+    local activeParts = {}
+    
+    for _, prompt in ipairs(prompts) do
+        local part = prompt.Parent
+        if part and part:IsA("BasePart") then
+            activeParts[part] = true
+            
+            if not ESPObjects[part] then
+                CreateEggESP(part)
+            end
+            
+            local esp = ESPObjects[part]
+            if esp then
+                local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local dist = (part.Position - Camera.CFrame.Position).Magnitude
+                    local size = 200 / dist
+                    
+                    esp.box.Size = Vector2.new(size, size)
+                    esp.box.Position = Vector2.new(pos.X - size/2, pos.Y - size/2)
+                    esp.box.Visible = true
+                    
+                    esp.text.Text = "🥚 " .. string.format("%.0f", dist) .. "m"
+                    esp.text.Position = Vector2.new(pos.X, pos.Y - size/2 - 18)
+                    esp.text.Visible = true
+                else
+                    esp.box.Visible = false
+                    esp.text.Visible = false
+                end
+            end
+        end
+    end
+    
+    -- Sembunyikan yang sudah tidak ada
+    for part, esp in pairs(ESPObjects) do
+        if not activeParts[part] then
+            esp.box.Visible = false
+            esp.text.Visible = false
+        end
+    end
+end
+
+-- ============================================
+--  🚀 MAIN LOOP
+-- ============================================
+
+RunService.Heartbeat:Connect(function()
+    -- Auto Steal
+    if SouGPT_Config.AutoSteal then
+        local prompt = GetClosestEggPrompt()
+        if prompt then
+            StealEgg(prompt)
+        end
+    end
+    
+    -- Auto Place & Hatch
+    if SouGPT_Config.AutoPlace or SouGPT_Config.AutoHatch then
+        AutoPlaceAndHatch()
+    end
+    
+    -- ESP
+    UpdateEggESP()
+end)
+
+-- ============================================
+--  🎮 GUI SEDERHANA (Delta)
+-- ============================================
+
+local function CreateGUI()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "SouGPT_StealEgg"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.Parent = LP:WaitForChild("PlayerGui")
+    
+    local Main = Instance.new("Frame")
+    Main.Size = UDim2.new(0, 220, 0, 280)
+    Main.Position = UDim2.new(0, 20, 0.3, 0)
+    Main.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+    Main.BorderSizePixel = 0
+    Main.Active = true
+    Main.Draggable = true
+    Main.Parent = ScreenGui
+    
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 8)
+    Corner.Parent = Main
+    
+    -- Title
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(1, 0, 0, 40)
+    Title.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    Title.BorderSizePixel = 0
+    Title.Text = "🥚 SouGPT Auto-Steal"
+    Title.TextColor3 = Color3.fromRGB(255, 200, 0)
+    Title.TextSize = 16
+    Title.Font = Enum.Font.GothamBold
+    Title.Parent = Main
+    
+    local TitleCorner = Instance.new("UICorner")
+    TitleCorner.CornerRadius = UDim.new(0, 8)
+    TitleCorner.Parent = Title
+    
+    -- Toggle function
+    local function CreateToggle(name, yPos, configKey)
+        local Btn = Instance.new("TextButton")
+        Btn.Size = UDim2.new(0.9, 0, 0, 35)
+        Btn.Position = UDim2.new(0.05, 0, 0, yPos)
+        Btn.BackgroundColor3 = SouGPT_Config[configKey] and Color3.fromRGB(0, 120, 60) or Color3.fromRGB(40, 40, 50)
+        Btn.BorderSizePixel = 0
+        Btn.Text = (SouGPT_Config[configKey] and "✅ " or "❌ ") .. name
+        Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Btn.TextSize = 14
+        Btn.Font = Enum.Font.Gotham
+        Btn.Parent = Main
+        
+        local BtnCorner = Instance.new("UICorner")
+        BtnCorner.CornerRadius = UDim.new(0, 6)
+        BtnCorner.Parent = Btn
+        
+        Btn.MouseButton1Click:Connect(function()
+            SouGPT_Config[configKey] = not SouGPT_Config[configKey]
+            Btn.BackgroundColor3 = SouGPT_Config[configKey] and Color3.fromRGB(0, 120, 60) or Color3.fromRGB(40, 40, 50)
+            Btn.Text = (SouGPT_Config[configKey] and "✅ " or "❌ ") .. name
+        end)
+    end
+    
+    CreateToggle("Auto Steal", 55, "AutoSteal")
+    CreateToggle("Auto Place", 100, "AutoPlace")
+    CreateToggle("Auto Hatch", 145, "AutoHatch")
+    CreateToggle("Egg ESP", 190, "ESP")
+    
+    -- Status
+    local Status = Instance.new("TextLabel")
+    Status.Size = UDim2.new(0.9, 0, 0, 25)
+    Status.Position = UDim2.new(0.05, 0, 0, 235)
+    Status.BackgroundTransparency = 1
+    Status.Text = "Status: Aktif | Eggs: 0"
+    Status.TextColor3 = Color3.fromRGB(180, 180, 180)
+    Status.TextSize = 12
+    Status.Font = Enum.Font.Gotham
+    Status.Parent = Main
+    
+    -- Update status
+    task.spawn(function()
+        while ScreenGui.Parent do
+            Status.Text = string.format("Status: Aktif | Eggs: %d", stolenEggs)
+            task.wait(0.5)
+        end
+    end)
+end
+
+-- ============================================
+--  🚀 EKSEKUSI
+-- ============================================
+
+CreateGUI()
+print("========================================")
+print("🥚 SOUGPT AUTO-STEAL — Steal an Egg")
+print("========================================")
+print("✅ Auto Steal aktif")
+print("✅ Auto Place aktif")
+print("✅ Auto Hatch aktif")
+print("✅ Egg ESP tersedia (toggle di GUI)")
+print("========================================")
