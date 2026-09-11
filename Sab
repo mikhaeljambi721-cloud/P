@@ -1,0 +1,592 @@
+-- ============================================
+--  🎯 SOUGPT AIMBOT + ESP
+--  Rayfield UI | Delta Optimized
+-- ============================================
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+-- ============================================
+--  🎨 LOAD UI
+-- ============================================
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "SouGPT | Aimbot + ESP",
+    LoadingTitle = "Memuat SouGPT...",
+    LoadingSubtitle = "by SouGPT untuk Tuanku Xso",
+    Theme = "DarkBlue",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "SouGPT_Aimbot",
+        FileName = "Config"
+    },
+    KeySystem = false
+})
+
+-- ============================================
+--  ⚙️ KONFIGURASI
+-- ============================================
+
+getgenv().Config = {
+    -- Aimbot
+    Aimbot = false,
+    AimKey = Enum.UserInputType.MouseButton2, -- Klik kanan
+    FOV = 150,
+    Smoothness = 0.15,
+    AimPart = "Head",
+    TeamCheck = true,
+    VisibleCheck = false,
+    Prediction = 0.12,
+    
+    -- ESP
+    ESP = false,
+    BoxESP = true,
+    NameESP = true,
+    HealthESP = true,
+    DistanceESP = true,
+    TracerESP = false,
+    BoxColor = Color3.fromRGB(0, 255, 0),
+    TracerColor = Color3.fromRGB(255, 255, 255),
+    
+    -- Misc
+    FOVCircle = true,
+    FOVColor = Color3.fromRGB(255, 255, 255)
+}
+
+local Config = getgenv().Config
+
+-- ============================================
+--  📦 SERVICE & LIBRARY
+-- ============================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LP = Players.LocalPlayer
+local Mouse = LP:GetMouse()
+
+local Drawing = Drawing or debug.getupvalue(getrenv().Drawing, 1) or Drawing
+
+local aimKeyHeld = false
+local FOVCircle = nil
+local ESPObjects = {}
+
+-- ============================================
+--  🎯 AIMBOT ENGINE
+-- ============================================
+
+local function IsVisible(part)
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    rayParams.FilterDescendantsInstances = {LP.Character, part.Parent}
+    local origin = Camera.CFrame.Position
+    local direction = (part.Position - origin)
+    local result = workspace:Raycast(origin, direction, rayParams)
+    return result == nil
+end
+
+local function GetAimTarget()
+    local closest = nil
+    local shortest = Config.FOV * 2
+    local center = Camera.ViewportSize / 2
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player == LP then continue end
+        if not player.Character then continue end
+        
+        local hum = player.Character:FindFirstChildOfClass("Humanoid")
+        if not hum or hum.Health <= 0 then continue end
+        
+        if Config.TeamCheck and player.Team == LP.Team then continue end
+        
+        local part = player.Character:FindFirstChild(Config.AimPart)
+        if not part then continue end
+        
+        if Config.VisibleCheck and not IsVisible(part) then continue end
+        
+        -- Prediksi gerakan
+        local velocity = hum.MoveDirection * hum.WalkSpeed
+        local predictedPos = part.Position + (velocity * Config.Prediction)
+        
+        local pos, onScreen = Camera:WorldToViewportPoint(predictedPos)
+        if not onScreen then continue end
+        
+        local delta = Vector2.new(pos.X - center.X, pos.Y - center.Y)
+        local mag = delta.Magnitude
+        
+        if mag < shortest then
+            shortest = mag
+            closest = {player = player, pos = predictedPos, part = part}
+        end
+    end
+    return closest
+end
+
+local function AimAt(target)
+    if not target then return end
+    local current = Camera.CFrame
+    local lookAt = CFrame.lookAt(current.Position, target.pos)
+    Camera.CFrame = current:Lerp(lookAt, Config.Smoothness)
+end
+
+-- ============================================
+--  👁️ ESP ENGINE
+-- ============================================
+
+local function CreateESP(player)
+    if ESPObjects[player] then return end
+    if not Drawing then return end
+    
+    local box = Drawing.new("Square")
+    box.Thickness = 1.5
+    box.Color = Config.BoxColor
+    box.Filled = false
+    box.Transparency = 0.7
+    
+    local name = Drawing.new("Text")
+    name.Size = 14
+    name.Color = Color3.fromRGB(255, 255, 255)
+    name.Center = true
+    name.Outline = true
+    name.OutlineColor = Color3.fromRGB(0, 0, 0)
+    
+    local health = Drawing.new("Text")
+    health.Size = 12
+    health.Color = Color3.fromRGB(0, 255, 0)
+    health.Center = true
+    health.Outline = true
+    health.OutlineColor = Color3.fromRGB(0, 0, 0)
+    
+    local dist = Drawing.new("Text")
+    dist.Size = 12
+    dist.Color = Color3.fromRGB(200, 200, 200)
+    dist.Center = true
+    dist.Outline = true
+    dist.OutlineColor = Color3.fromRGB(0, 0, 0)
+    
+    local tracer = Drawing.new("Line")
+    tracer.Thickness = 1
+    tracer.Color = Config.TracerColor
+    tracer.Transparency = 0.7
+    
+    ESPObjects[player] = {
+        box = box, name = name, health = health,
+        dist = dist, tracer = tracer
+    }
+end
+
+local function HideESP(esp)
+    esp.box.Visible = false
+    esp.name.Visible = false
+    esp.health.Visible = false
+    esp.dist.Visible = false
+    esp.tracer.Visible = false
+end
+
+local function UpdateESP()
+    if not Drawing then return end
+    
+    for player, esp in pairs(ESPObjects) do
+        if not Config.ESP then HideESP(esp) continue end
+        if player == LP or not player.Character then HideESP(esp) continue end
+        
+        local head = player.Character:FindFirstChild("Head")
+        local root = player.Character:FindFirstChild("HumanoidRootPart")
+        local hum = player.Character:FindFirstChildOfClass("Humanoid")
+        if not head or not root or not hum or hum.Health <= 0 then
+            HideESP(esp)
+            continue
+        end
+        
+        if Config.TeamCheck and player.Team == LP.Team then HideESP(esp) continue end
+        
+        local headPos, onScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+        local rootPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
+        
+        if not onScreen then HideESP(esp) continue end
+        
+        local height = math.abs(headPos.Y - rootPos.Y)
+        local width = height * 0.6
+        local boxPos = Vector2.new(headPos.X - width/2, headPos.Y)
+        
+        -- Box
+        if Config.BoxESP then
+            esp.box.Size = Vector2.new(width, height)
+            esp.box.Position = boxPos
+            esp.box.Color = Config.BoxColor
+            esp.box.Visible = true
+        else
+            esp.box.Visible = false
+        end
+        
+        -- Name
+        if Config.NameESP then
+            esp.name.Text = player.Name
+            esp.name.Position = Vector2.new(headPos.X, headPos.Y - 18)
+            esp.name.Visible = true
+        else
+            esp.name.Visible = false
+        end
+        
+        -- Health
+        if Config.HealthESP then
+            esp.health.Text = string.format("❤ %d", math.floor(hum.Health))
+            esp.health.Position = Vector2.new(headPos.X, headPos.Y + height + 2)
+            esp.health.Color = Color3.fromRGB(
+                255 * (1 - hum.Health/100),
+                255 * (hum.Health/100),
+                0
+            )
+            esp.health.Visible = true
+        else
+            esp.health.Visible = false
+        end
+        
+        -- Distance
+        if Config.DistanceESP then
+            local distance = (root.Position - Camera.CFrame.Position).Magnitude
+            esp.dist.Text = string.format("[%d studs]", math.floor(distance))
+            esp.dist.Position = Vector2.new(headPos.X, headPos.Y + height + 16)
+            esp.dist.Visible = true
+        else
+            esp.dist.Visible = false
+        end
+        
+        -- Tracer
+        if Config.TracerESP then
+            esp.tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+            esp.tracer.To = Vector2.new(headPos.X, headPos.Y + height/2)
+            esp.tracer.Color = Config.TracerColor
+            esp.tracer.Visible = true
+        else
+            esp.tracer.Visible = false
+        end
+    end
+end
+
+-- ============================================
+--  ⭕ FOV CIRCLE
+-- ============================================
+
+local function UpdateFOVCircle()
+    if not Drawing then return end
+    
+    if not FOVCircle then
+        FOVCircle = Drawing.new("Circle")
+        FOVCircle.Thickness = 1
+        FOVCircle.NumSides = 60
+        FOVCircle.Radius = Config.FOV
+        FOVCircle.Filled = false
+        FOVCircle.Transparency = 0.5
+    end
+    
+    FOVCircle.Color = Config.FOVColor
+    FOVCircle.Position = Camera.ViewportSize / 2
+    FOVCircle.Radius = Config.FOV
+    FOVCircle.Visible = Config.FOVCircle and Config.Aimbot
+end
+
+-- ============================================
+--  🚀 MAIN LOOP
+-- ============================================
+
+RunService.RenderStepped:Connect(function()
+    -- Aimbot
+    if Config.Aimbot and aimKeyHeld then
+        local target = GetAimTarget()
+        if target then AimAt(target) end
+    end
+    
+    -- ESP
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LP and player.Character then
+            if not ESPObjects[player] then CreateESP(player) end
+        end
+    end
+    UpdateESP()
+    
+    -- FOV Circle
+    UpdateFOVCircle()
+end)
+
+-- ============================================
+--  🖱️ INPUT HANDLER
+-- ============================================
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.UserInputType == Config.AimKey then
+        aimKeyHeld = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Config.AimKey then
+        aimKeyHeld = false
+    end
+end)
+
+-- ============================================
+--  👥 PLAYER HANDLING
+-- ============================================
+
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function()
+        task.wait(1)
+        if not ESPObjects[player] then CreateESP(player) end
+    end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    if ESPObjects[player] then
+        for _, obj in pairs(ESPObjects[player]) do
+            obj:Remove()
+        end
+        ESPObjects[player] = nil
+    end
+end)
+
+for _, player in pairs(Players:GetPlayers()) do
+    if player ~= LP then
+        CreateESP(player)
+    end
+end
+
+-- ============================================
+--  🎨 UI TABS
+-- ============================================
+
+-- TAB AIMBOT
+local AimbotTab = Window:CreateTab("🎯 Aimbot", 4483362458)
+
+AimbotTab:CreateSection("Aimbot Settings")
+
+AimbotTab:CreateToggle({
+    Name = "Enable Aimbot",
+    CurrentValue = false,
+    Flag = "AimbotToggle",
+    Callback = function(Value)
+        Config.Aimbot = Value
+    end
+})
+
+AimbotTab:CreateSlider({
+    Name = "FOV",
+    Range = {10, 500},
+    Increment = 5,
+    Suffix = " px",
+    CurrentValue = 150,
+    Flag = "FOVSlider",
+    Callback = function(Value)
+        Config.FOV = Value
+    end
+})
+
+AimbotTab:CreateSlider({
+    Name = "Smoothness",
+    Range = {0, 1},
+    Increment = 0.01,
+    Suffix = "",
+    CurrentValue = 0.15,
+    Flag = "SmoothSlider",
+    Callback = function(Value)
+        Config.Smoothness = Value
+    end
+})
+
+AimbotTab:CreateSlider({
+    Name = "Prediction",
+    Range = {0, 0.5},
+    Increment = 0.01,
+    Suffix = " s",
+    CurrentValue = 0.12,
+    Flag = "PredictionSlider",
+    Callback = function(Value)
+        Config.Prediction = Value
+    end
+})
+
+AimbotTab:CreateDropdown({
+    Name = "Aim Part",
+    Options = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"},
+    CurrentOption = {"Head"},
+    Flag = "AimPartDropdown",
+    Callback = function(Option)
+        Config.AimPart = Option[1]
+    end
+})
+
+AimbotTab:CreateSection("Filter")
+
+AimbotTab:CreateToggle({
+    Name = "Team Check",
+    CurrentValue = true,
+    Flag = "TeamCheck",
+    Callback = function(Value)
+        Config.TeamCheck = Value
+    end
+})
+
+AimbotTab:CreateToggle({
+    Name = "Visible Check",
+    CurrentValue = false,
+    Flag = "VisibleCheck",
+    Callback = function(Value)
+        Config.VisibleCheck = Value
+    end
+})
+
+-- TAB ESP
+local ESPTab = Window:CreateTab("👁️ ESP", 4483362458)
+
+ESPTab:CreateSection("ESP Toggle")
+
+ESPTab:CreateToggle({
+    Name = "Enable ESP",
+    CurrentValue = false,
+    Flag = "ESPToggle",
+    Callback = function(Value)
+        Config.ESP = Value
+    end
+})
+
+ESPTab:CreateSection("ESP Elements")
+
+ESPTab:CreateToggle({
+    Name = "Box ESP",
+    CurrentValue = true,
+    Flag = "BoxESP",
+    Callback = function(Value)
+        Config.BoxESP = Value
+    end
+})
+
+ESPTab:CreateToggle({
+    Name = "Name ESP",
+    CurrentValue = true,
+    Flag = "NameESP",
+    Callback = function(Value)
+        Config.NameESP = Value
+    end
+})
+
+ESPTab:CreateToggle({
+    Name = "Health ESP",
+    CurrentValue = true,
+    Flag = "HealthESP",
+    Callback = function(Value)
+        Config.HealthESP = Value
+    end
+})
+
+ESPTab:CreateToggle({
+    Name = "Distance ESP",
+    CurrentValue = true,
+    Flag = "DistanceESP",
+    Callback = function(Value)
+        Config.DistanceESP = Value
+    end
+})
+
+ESPTab:CreateToggle({
+    Name = "Tracer ESP",
+    CurrentValue = false,
+    Flag = "TracerESP",
+    Callback = function(Value)
+        Config.TracerESP = Value
+    end
+})
+
+ESPTab:CreateSection("Colors")
+
+ESPTab:CreateColorPicker({
+    Name = "Box Color",
+    Color = Color3.fromRGB(0, 255, 0),
+    Flag = "BoxColor",
+    Callback = function(Value)
+        Config.BoxColor = Value
+    end
+})
+
+ESPTab:CreateColorPicker({
+    Name = "Tracer Color",
+    Color = Color3.fromRGB(255, 255, 255),
+    Flag = "TracerColor",
+    Callback = function(Value)
+        Config.TracerColor = Value
+    end
+})
+
+-- TAB VISUAL
+local VisualTab = Window:CreateTab("🔮 Visual", 4483362458)
+
+VisualTab:CreateSection("FOV Circle")
+
+VisualTab:CreateToggle({
+    Name = "Show FOV Circle",
+    CurrentValue = true,
+    Flag = "FOVCircle",
+    Callback = function(Value)
+        Config.FOVCircle = Value
+    end
+})
+
+VisualTab:CreateColorPicker({
+    Name = "FOV Circle Color",
+    Color = Color3.fromRGB(255, 255, 255),
+    Flag = "FOVColor",
+    Callback = function(Value)
+        Config.FOVColor = Value
+    end
+})
+
+-- TAB SETTINGS
+local SettingsTab = Window:CreateTab("⚙️ Settings", 4483362458)
+
+SettingsTab:CreateSection("Keybind")
+
+SettingsTab:CreateDropdown({
+    Name = "Aimbot Key",
+    Options = {"MouseButton2", "MouseButton1", "E", "Q", "LeftShift", "LeftControl"},
+    CurrentOption = {"MouseButton2"},
+    Flag = "AimKey",
+    Callback = function(Option)
+        local keys = {
+            MouseButton2 = Enum.UserInputType.MouseButton2,
+            MouseButton1 = Enum.UserInputType.MouseButton1,
+            E = Enum.KeyCode.E,
+            Q = Enum.KeyCode.Q,
+            LeftShift = Enum.KeyCode.LeftShift,
+            LeftControl = Enum.KeyCode.LeftControl,
+        }
+        Config.AimKey = keys[Option[1]]
+    end
+})
+
+SettingsTab:CreateSection("Info")
+
+SettingsTab:CreateButton({
+    Name = "Reset Config",
+    Callback = function()
+        Rayfield:Notify({
+            Title = "SouGPT",
+            Content = "Config direset. Silakan rejoin.",
+            Duration = 3
+        })
+    end
+})
+
+-- ============================================
+--  🚀 NOTIFIKASI START
+-- ============================================
+
+Rayfield:Notify({
+    Title = "SouGPT Aimbot + ESP",
+    Content = "UI berhasil dimuat! Selamat berburu, Tuanku.",
+    Duration = 4,
+    Image = 4483362458
+})
+
+print("[🎯 SouGPT] Aimbot + ESP loaded successfully.")
