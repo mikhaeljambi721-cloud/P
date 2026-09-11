@@ -1,0 +1,266 @@
+-- =====================================================
+-- GUI SCRIPT: Speed Control (Max 80000) + God Mode
+-- =====================================================
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-- =====================================================
+-- BUAT GUI
+-- =====================================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CustomSpeedGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- Frame Utama (Kotak)
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 260, 0, 200)
+MainFrame.Position = UDim2.new(0.5, -130, 0.5, -100)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+-- UIGradient untuk tampilan lebih rapi
+local Gradient = Instance.new("UIGradient")
+Gradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 50, 60)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 25, 30)),
+})
+Gradient.Rotation = 90
+Gradient.Parent = MainFrame
+
+-- UICorner untuk sudut membulat
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = MainFrame
+
+-- Title Bar
+local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
+TitleBar.Size = UDim2.new(1, 0, 0, 30)
+TitleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = TitleBar
+
+-- Judul
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, -40, 1, 0)
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "⚡ Speed Control"
+TitleLabel.TextColor3 = Color3.fromRGB(220, 220, 230)
+TitleLabel.TextSize = 16
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TitleBar
+
+-- Tombol Close (X)
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, -30, 0, 0)
+CloseBtn.BackgroundTransparency = 1
+CloseBtn.Text = "✕"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+CloseBtn.TextSize = 16
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.Parent = TitleBar
+
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui.Enabled = false
+end)
+
+-- =====================================================
+-- TOMBOL ON/OFF SPEED
+-- =====================================================
+local SpeedToggleBtn = Instance.new("TextButton")
+SpeedToggleBtn.Size = UDim2.new(0, 240, 0, 36)
+SpeedToggleBtn.Position = UDim2.new(0, 10, 0, 45)
+SpeedToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+SpeedToggleBtn.BorderSizePixel = 0
+SpeedToggleBtn.Text = "Speed: OFF"
+SpeedToggleBtn.TextColor3 = Color3.fromRGB(200, 200, 210)
+SpeedToggleBtn.TextSize = 14
+SpeedToggleBtn.Font = Enum.Font.GothamMedium
+SpeedToggleBtn.Parent = MainFrame
+
+local ToggleCorner = Instance.new("UICorner")
+ToggleCorner.CornerRadius = UDim.new(0, 6)
+ToggleCorner.Parent = SpeedToggleBtn
+
+-- =====================================================
+-- INPUT SPEED
+-- =====================================================
+local SpeedInput = Instance.new("TextBox")
+SpeedInput.Size = UDim2.new(0, 160, 0, 36)
+SpeedInput.Position = UDim2.new(0, 10, 0, 95)
+SpeedInput.BackgroundColor3 = Color3.fromRGB(55, 55, 65)
+SpeedInput.BorderSizePixel = 0
+SpeedInput.Text = "16"
+SpeedInput.PlaceholderText = "Speed (1-80000)"
+SpeedInput.TextColor3 = Color3.fromRGB(220, 220, 230)
+SpeedInput.TextSize = 14
+SpeedInput.Font = Enum.Font.GothamMedium
+SpeedInput.Parent = MainFrame
+
+local InputCorner = Instance.new("UICorner")
+InputCorner.CornerRadius = UDim.new(0, 6)
+InputCorner.Parent = SpeedInput
+
+-- Tombol Apply
+local ApplyBtn = Instance.new("TextButton")
+ApplyBtn.Size = UDim2.new(0, 70, 0, 36)
+ApplyBtn.Position = UDim2.new(0, 180, 0, 95)
+ApplyBtn.BackgroundColor3 = Color3.fromRGB(70, 130, 200)
+ApplyBtn.BorderSizePixel = 0
+ApplyBtn.Text = "Set"
+ApplyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ApplyBtn.TextSize = 14
+ApplyBtn.Font = Enum.Font.GothamBold
+ApplyBtn.Parent = MainFrame
+
+local ApplyCorner = Instance.new("UICorner")
+ApplyCorner.CornerRadius = UDim.new(0, 6)
+ApplyCorner.Parent = ApplyBtn
+
+-- =====================================================
+-- TOMBOL GOD MODE
+-- =====================================================
+local GodToggleBtn = Instance.new("TextButton")
+GodToggleBtn.Size = UDim2.new(0, 240, 0, 36)
+GodToggleBtn.Position = UDim2.new(0, 10, 0, 145)
+GodToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+GodToggleBtn.BorderSizePixel = 0
+GodToggleBtn.Text = "God Mode: OFF"
+GodToggleBtn.TextColor3 = Color3.fromRGB(200, 200, 210)
+GodToggleBtn.TextSize = 14
+GodToggleBtn.Font = Enum.Font.GothamMedium
+GodToggleBtn.Parent = MainFrame
+
+local GodCorner = Instance.new("UICorner")
+GodCorner.CornerRadius = UDim.new(0, 6)
+GodCorner.Parent = MainFrame
+
+-- =====================================================
+-- LOGIKA SCRIPT
+-- =====================================================
+
+local speedEnabled = false
+local godEnabled = false
+local currentSpeed = 16
+local godConnection = nil
+
+-- Update UI saat respawn
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoid = newChar:WaitForChild("Humanoid")
+    rootPart = newChar:WaitForChild("HumanoidRootPart")
+    
+    if speedEnabled then
+        humanoid.WalkSpeed = currentSpeed
+    end
+end)
+
+-- Fungsi Toggle Speed
+SpeedToggleBtn.MouseButton1Click:Connect(function()
+    speedEnabled = not speedEnabled
+    
+    if speedEnabled then
+        SpeedToggleBtn.Text = "Speed: ON"
+        SpeedToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 70)
+        humanoid.WalkSpeed = currentSpeed
+    else
+        SpeedToggleBtn.Text = "Speed: OFF"
+        SpeedToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        humanoid.WalkSpeed = 16
+    end
+end)
+
+-- Fungsi Apply Speed
+ApplyBtn.MouseButton1Click:Connect(function()
+    local input = tonumber(SpeedInput.Text)
+    
+    if input then
+        -- Clamp max 80000
+        currentSpeed = math.clamp(input, 1, 80000)
+        SpeedInput.Text = tostring(currentSpeed)
+        
+        if speedEnabled then
+            humanoid.WalkSpeed = currentSpeed
+        end
+    else
+        SpeedInput.Text = tostring(currentSpeed)
+    end
+end)
+
+-- Fungsi Toggle God Mode
+GodToggleBtn.MouseButton1Click:Connect(function()
+    godEnabled = not godEnabled
+    
+    if godEnabled then
+        GodToggleBtn.Text = "God Mode: ON"
+        GodToggleBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 70)
+        
+        -- God Mode: Humanoid tidak bisa mati
+        godConnection = RunService.Heartbeat:Connect(function()
+            if humanoid and humanoid.Parent then
+                humanoid.MaxHealth = math.huge
+                humanoid.Health = math.huge
+            end
+        end)
+    else
+        GodToggleBtn.Text = "God Mode: OFF"
+        GodToggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        
+        if godConnection then
+            godConnection:Disconnect()
+            godConnection = nil
+        end
+        
+        -- Reset health ke normal
+        if humanoid and humanoid.Parent then
+            humanoid.MaxHealth = 100
+            humanoid.Health = 100
+        end
+    end
+end)
+
+-- =====================================================
+-- HANDLE RESPAWN (perbaiki referensi character)
+-- =====================================================
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoid = newChar:WaitForChild("Humanoid")
+    rootPart = newChar:WaitForChild("HumanoidRootPart")
+    
+    if speedEnabled then
+        humanoid.WalkSpeed = currentSpeed
+    end
+    
+    if godEnabled and godConnection then
+        godConnection:Disconnect()
+        godConnection = nil
+        -- Reconnect god mode
+        godConnection = RunService.Heartbeat:Connect(function()
+            if humanoid and humanoid.Parent then
+                humanoid.MaxHealth = math.huge
+                humanoid.Health = math.huge
+            end
+        end)
+    end
+end)
+
+print("✅ GUI Loaded! Tekan X untuk menutup, drag Title Bar untuk menggeser.")
