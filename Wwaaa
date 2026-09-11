@@ -1,0 +1,370 @@
+-- ============================================
+--  🥚 SOUGPT x MIRANDA — Steal an Egg Auto Farm
+--  Rayfield UI Edition | Delta Optimized
+-- ============================================
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+-- ============================================
+--  🎨 LOAD RAYFIELD UI (Miranda Style)
+-- ============================================
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "SouGPT | Steal an Egg",
+    Icon = 0,
+    LoadingTitle = "Memuat SouGPT Hub...",
+    LoadingSubtitle = "by SouGPT untuk Tuanku Xso",
+    Theme = "DarkBlue",
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "SouGPT_StealEgg",
+        FileName = "Config"
+    },
+    Discord = { Enabled = false },
+    KeySystem = false
+})
+
+-- ============================================
+--  ⚙️ KONFIGURASI
+-- ============================================
+
+local Config = {
+    AutoSteal = false,
+    StealRange = 15,
+    StealDelay = 0.3,
+    AutoPlace = false,
+    AutoHatch = false,
+    ESP = false,
+    ESPColor = Color3.fromRGB(255, 200, 0),
+    Notify = true,
+}
+
+local stolenEggs = 0
+
+-- ============================================
+--  📦 SERVICE
+-- ============================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LP = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local Drawing = Drawing or debug.getupvalue(getrenv().Drawing, 1) or Drawing
+
+-- ============================================
+--  🔍 DETEKSI EGG
+-- ============================================
+
+local function GetAllEggPrompts()
+    local prompts = {}
+    local function scan(obj)
+        if obj:IsA("ProximityPrompt") then
+            local action = obj.ActionText:lower()
+            local object = obj.ObjectText:lower()
+            if action:find("steal") or action:find("egg") or
+               action:find("take") or object:find("egg") then
+                table.insert(prompts, obj)
+            end
+        end
+        for _, child in ipairs(obj:GetChildren()) do
+            scan(child)
+        end
+    end
+    scan(workspace)
+    return prompts
+end
+
+local function GetClosestEggPrompt()
+    local closest, shortest = nil, Config.StealRange
+    local char = LP.Character
+    if not char then return nil end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    for _, prompt in ipairs(GetAllEggPrompts()) do
+        local part = prompt.Parent
+        if part and part:IsA("BasePart") then
+            local dist = (part.Position - root.Position).Magnitude
+            if dist < shortest then
+                shortest = dist
+                closest = prompt
+            end
+        end
+    end
+    return closest
+end
+
+-- ============================================
+--  🎯 AUTO STEAL ENGINE
+-- ============================================
+
+local lastSteal = 0
+
+local function StealEgg(prompt)
+    if not prompt then return end
+    local now = tick()
+    if now - lastSteal < Config.StealDelay then return end
+    lastSteal = now
+
+    pcall(function()
+        prompt:InputHoldBegin()
+        task.wait(prompt.HoldDuration or 0.1)
+        prompt:InputHoldEnd()
+    end)
+
+    stolenEggs = stolenEggs + 1
+    if Config.Notify then
+        Rayfield:Notify({
+            Title = "SouGPT Auto-Steal",
+            Content = "Egg stolen! Total: " .. stolenEggs,
+            Duration = 2,
+            Image = 4483362458
+        })
+    end
+end
+
+-- ============================================
+--  🏠 AUTO PLACE & HATCH
+-- ============================================
+
+local function GetPlacePrompt()
+    local char = LP.Character
+    if not char then return nil end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") then
+            local action = obj.ActionText:lower()
+            local object = obj.ObjectText:lower()
+            if action:find("place") or action:find("hatch") or
+               action:find("incubat") or object:find("pen") or object:find("nest") then
+                local part = obj.Parent
+                if part and part:IsA("BasePart") then
+                    local dist = (part.Position - root.Position).Magnitude
+                    if dist < 20 then return obj end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function AutoPlaceAndHatch()
+    if not Config.AutoPlace and not Config.AutoHatch then return end
+    local prompt = GetPlacePrompt()
+    if prompt then
+        pcall(function()
+            prompt:InputHoldBegin()
+            task.wait(0.1)
+            prompt:InputHoldEnd()
+        end)
+    end
+end
+
+-- ============================================
+--  👁️ ESP
+-- ============================================
+
+local ESPObjects = {}
+
+local function CreateEggESP(part)
+    if ESPObjects[part] or not Drawing then return end
+    local box = Drawing.new("Box")
+    box.Thickness = 1.5
+    box.Color = Config.ESPColor
+    box.Filled = false
+    box.Transparency = 0.6
+    local text = Drawing.new("Text")
+    text.Size = 14
+    text.Color = Color3.fromRGB(255, 255, 255)
+    text.Center = true
+    text.Outline = true
+    text.OutlineColor = Color3.fromRGB(0, 0, 0)
+    ESPObjects[part] = {box = box, text = text}
+end
+
+local function UpdateEggESP()
+    if not Config.ESP or not Drawing then
+        for _, esp in pairs(ESPObjects) do
+            esp.box.Visible = false
+            esp.text.Visible = false
+        end
+        return
+    end
+    local prompts = GetAllEggPrompts()
+    local activeParts = {}
+    for _, prompt in ipairs(prompts) do
+        local part = prompt.Parent
+        if part and part:IsA("BasePart") then
+            activeParts[part] = true
+            if not ESPObjects[part] then CreateEggESP(part) end
+            local esp = ESPObjects[part]
+            if esp then
+                local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local dist = (part.Position - Camera.CFrame.Position).Magnitude
+                    local size = 200 / dist
+                    esp.box.Size = Vector2.new(size, size)
+                    esp.box.Position = Vector2.new(pos.X - size/2, pos.Y - size/2)
+                    esp.box.Visible = true
+                    esp.text.Text = "🥚 " .. string.format("%.0f", dist) .. "m"
+                    esp.text.Position = Vector2.new(pos.X, pos.Y - size/2 - 18)
+                    esp.text.Visible = true
+                else
+                    esp.box.Visible = false
+                    esp.text.Visible = false
+                end
+            end
+        end
+    end
+    for part, esp in pairs(ESPObjects) do
+        if not activeParts[part] then
+            esp.box.Visible = false
+            esp.text.Visible = false
+        end
+    end
+end
+
+-- ============================================
+--  🚀 MAIN LOOP
+-- ============================================
+
+RunService.Heartbeat:Connect(function()
+    if Config.AutoSteal then
+        local prompt = GetClosestEggPrompt()
+        if prompt then StealEgg(prompt) end
+    end
+    if Config.AutoPlace or Config.AutoHatch then
+        AutoPlaceAndHatch()
+    end
+    UpdateEggESP()
+end)
+
+-- ============================================
+--  🎨 UI TABS (Miranda Style)
+-- ============================================
+
+local FarmTab = Window:CreateTab("🥚 Farm", 4483362458)
+FarmTab:CreateSection("Auto Steal")
+
+FarmTab:CreateToggle({
+    Name = "Auto Steal Egg",
+    CurrentValue = false,
+    Flag = "AutoSteal",
+    Callback = function(Value)
+        Config.AutoSteal = Value
+    end
+})
+
+FarmTab:CreateSlider({
+    Name = "Steal Range (stud)",
+    Range = {5, 50},
+    Increment = 1,
+    Suffix = " stud",
+    CurrentValue = 15,
+    Flag = "StealRange",
+    Callback = function(Value)
+        Config.StealRange = Value
+    end
+})
+
+FarmTab:CreateSlider({
+    Name = "Steal Delay (detik)",
+    Range = {0.1, 2},
+    Increment = 0.1,
+    Suffix = " s",
+    CurrentValue = 0.3,
+    Flag = "StealDelay",
+    Callback = function(Value)
+        Config.StealDelay = Value
+    end
+})
+
+FarmTab:CreateSection("Auto Base")
+
+FarmTab:CreateToggle({
+    Name = "Auto Place Egg",
+    CurrentValue = false,
+    Flag = "AutoPlace",
+    Callback = function(Value)
+        Config.AutoPlace = Value
+    end
+})
+
+FarmTab:CreateToggle({
+    Name = "Auto Hatch Egg",
+    CurrentValue = false,
+    Flag = "AutoHatch",
+    Callback = function(Value)
+        Config.AutoHatch = Value
+    end
+})
+
+-- ============================================
+--  👁️ TAB VISUAL
+-- ============================================
+
+local VisualTab = Window:CreateTab("👁️ Visual", 4483362458)
+VisualTab:CreateSection("Egg ESP")
+
+VisualTab:CreateToggle({
+    Name = "Egg ESP",
+    CurrentValue = false,
+    Flag = "ESP",
+    Callback = function(Value)
+        Config.ESP = Value
+    end
+})
+
+VisualTab:CreateColorPicker({
+    Name = "ESP Color",
+    Color = Color3.fromRGB(255, 200, 0),
+    Flag = "ESPColor",
+    Callback = function(Value)
+        Config.ESPColor = Value
+    end
+})
+
+-- ============================================
+--  ⚙️ TAB SETTINGS
+-- ============================================
+
+local SettingsTab = Window:CreateTab("⚙️ Settings", 4483362458)
+SettingsTab:CreateSection("Notifikasi")
+
+SettingsTab:CreateToggle({
+    Name = "Notify on Steal",
+    CurrentValue = true,
+    Flag = "Notify",
+    Callback = function(Value)
+        Config.Notify = Value
+    end
+})
+
+SettingsTab:CreateButton({
+    Name = "Reset Stolen Egg Counter",
+    Callback = function()
+        stolenEggs = 0
+        Rayfield:Notify({
+            Title = "SouGPT",
+            Content = "Counter direset ke 0.",
+            Duration = 2
+        })
+    end
+})
+
+-- ============================================
+--  🚀 SELESAI
+-- ============================================
+
+Rayfield:Notify({
+    Title = "SouGPT x Miranda Style",
+    Content = "Steal an Egg Auto Farm aktif!",
+    Duration = 3,
+    Image = 4483362458
+})
+
+print("[🥚 SouGPT] Miranda Style UI loaded.")
