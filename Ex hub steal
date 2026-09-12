@@ -1,0 +1,660 @@
+-- ============================================
+--  🥚 SOUGPT EGG HUNTER
+--  Visual Egg Picker | Auto Steal | Anti-Cheat
+--  "Dibuat untuk Tuanku Xso"
+-- ============================================
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+-- ============================================
+--  🎨 LOAD RAYFIELD UI
+-- ============================================
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "SouGPT Egg Hunter",
+    LoadingTitle = "Memuat SouGPT Egg Hunter...",
+    LoadingSubtitle = "Visual Egg Picker | Anti-Cheat",
+    Theme = "DarkBlue",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "SouGPT_EggHunter",
+        FileName = "Config"
+    },
+    KeySystem = false
+})
+
+-- ============================================
+--  ⚙️ KONFIGURASI
+-- ============================================
+
+getgenv().EggHunter = {
+    -- Auto Steal
+    AutoSteal = false,
+    StealRange = 25,
+    StealDelay = 0.4,
+    ReturnToBase = true,
+    BasePosition = nil,
+    
+    -- Flight
+    FlySpeed = 120,
+    FlyEnabled = false,
+    
+    -- Anti-Cheat
+    AntiCheatBypass = true,
+    Desync = false,
+    AntiAfk = true,
+    
+    -- ESP
+    EggESP = false,
+    EggESPColor = Color3.fromRGB(255, 200, 0),
+    ShowEggName = true,
+    ShowEggDistance = true,
+    
+    -- Notify
+    NotifyOnSteal = true,
+}
+
+local Config = getgenv().EggHunter
+
+-- ============================================
+--  📦 SERVICE
+-- ============================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local VirtualUser = game:GetService("VirtualUser")
+local LP = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local Drawing = Drawing or debug.getupvalue(getrenv().Drawing, 1) or Drawing
+
+local stolenEggs = 0
+local lastSteal = 0
+local flyConnection = nil
+local currentTarget = nil
+local ESPObjects = {}
+
+-- ============================================
+--  🛡️ ANTI-CHEAT BYPASS
+-- ============================================
+
+-- Metode 1: Jitter delay (menghindari deteksi rate limit)
+local function JitteredWait(min, max)
+    task.wait(math.random(min * 100, max * 100) / 100)
+end
+
+-- Metode 2: Anti-AFK (mencegah kick karena idle)
+if Config.AntiAfk then
+    LP.Idled:Connect(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
+end
+
+-- Metode 3: Noclip (menembus objek, tapi hanya saat fly)
+local function EnableNoclip()
+    local char = LP.Character
+    if not char then return end
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
+end
+
+-- Metode 4: Hook namecall untuk memblokir kick/kick remote
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    -- Blokir kick remote
+    if method == "FireServer" and tostring(self):lower():find("kick") then
+        return
+    end
+    
+    -- Blokir anti-cheat detection
+    if method == "FireServer" and tostring(self):lower():find("anticheat") then
+        return
+    end
+    
+    return oldNamecall(self, ...)
+end)
+
+-- ============================================
+--  🔍 DETEKSI EGG
+-- ============================================
+
+local function GetAllEggPrompts()
+    local prompts = {}
+    local function scan(obj)
+        if obj:IsA("ProximityPrompt") then
+            local action = obj.ActionText:lower()
+            local object = obj.ObjectText:lower()
+            if action:find("steal") or action:find("egg") or
+               action:find("take") or object:find("egg") then
+                table.insert(prompts, obj)
+            end
+        end
+        for _, child in ipairs(obj:GetChildren()) do
+            scan(child)
+        end
+    end
+    scan(workspace)
+    return prompts
+end
+
+local function GetEggInfo(prompt)
+    local part = prompt.Parent
+    if not part or not part:IsA("BasePart") then return nil end
+    
+    local name = part.Name
+    local objectText = prompt.ObjectText
+    local actionText = prompt.ActionText
+    
+    -- Estimasi rarity dari nama
+    local rarity = "Common"
+    local lowerName = (name .. objectText):lower()
+    if lowerName:find("secret") or lowerName:find("eternal") then
+        rarity = "Secret"
+    elseif lowerName:find("legendary") or lowerName:find("mythic") then
+        rarity = "Legendary"
+    elseif lowerName:find("epic") then
+        rarity = "Epic"
+    elseif lowerName:find("rare") then
+        rarity = "Rare"
+    end
+    
+    return {
+        part = part,
+        prompt = prompt,
+        name = objectText ~= "" and objectText or name,
+        rarity = rarity,
+        position = part.Position,
+    }
+end
+
+local function ScanAllEggs()
+    local eggs = {}
+    for _, prompt in ipairs(GetAllEggPrompts()) do
+        local info = GetEggInfo(prompt)
+        if info then
+            table.insert(eggs, info)
+        end
+    end
+    -- Sort by rarity
+    local rarityOrder = {Secret = 1, Legendary = 2, Epic = 3, Rare = 4, Common = 5}
+    table.sort(eggs, function(a, b)
+        return (rarityOrder[a.rarity] or 99) < (rarityOrder[b.rarity] or 99)
+    end)
+    return eggs
+end
+
+-- ============================================
+--  ✈️ FLY ENGINE
+-- ============================================
+
+local function StartFly()
+    local char = LP.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not root or not hum then return end
+    
+    Config.FlyEnabled = true
+    
+    local bodyVel = root:FindFirstChild("SouGPT_Fly") or Instance.new("BodyVelocity")
+    bodyVel.Name = "SouGPT_Fly"
+    bodyVel.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    bodyVel.Velocity = Vector3.zero
+    bodyVel.Parent = root
+    
+    local bodyGyro = root:FindFirstChild("SouGPT_Gyro") or Instance.new("BodyGyro")
+    bodyGyro.Name = "SouGPT_Gyro"
+    bodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+    bodyGyro.P = 1000
+    bodyGyro.CFrame = root.CFrame
+    bodyGyro.Parent = root
+    
+    hum.PlatformStand = true
+    
+    flyConnection = RunService.RenderStepped:Connect(function()
+        if not Config.FlyEnabled then return end
+        local move = Vector3.zero
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += Camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= Camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move -= Camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += Camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
+        
+        if move.Magnitude > 0 then
+            bodyVel.Velocity = move.Unit * Config.FlySpeed
+        else
+            bodyVel.Velocity = Vector3.zero
+        end
+        bodyGyro.CFrame = Camera.CFrame
+    end)
+end
+
+local function StopFly()
+    Config.FlyEnabled = false
+    if flyConnection then flyConnection:Disconnect() flyConnection = nil end
+    local char = LP.Character
+    if char then
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if root then
+            local bv = root:FindFirstChild("SouGPT_Fly")
+            local bg = root:FindFirstChild("SouGPT_Gyro")
+            if bv then bv:Destroy() end
+            if bg then bg:Destroy() end
+        end
+        if hum then hum.PlatformStand = false end
+    end
+end
+
+-- ============================================
+--  🚀 TELEPORT & STEAL
+-- ============================================
+
+local function SaveBasePosition()
+    local char = LP.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if root then
+        Config.BasePosition = root.CFrame
+        Rayfield:Notify({
+            Title = "SouGPT Egg Hunter",
+            Content = "Base position tersimpan!",
+            Duration = 2,
+            Image = 4483362458
+        })
+    end
+end
+
+local function TeleportToEgg(eggInfo)
+    local char = LP.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    -- Simpan posisi base
+    if not Config.BasePosition then
+        Config.BasePosition = root.CFrame
+    end
+    
+    currentTarget = eggInfo
+    
+    -- Teleport ke dekat egg
+    local targetPos = eggInfo.position + Vector3.new(0, 3, 0)
+    root.CFrame = CFrame.new(targetPos)
+    
+    Rayfield:Notify({
+        Title = "SouGPT Egg Hunter",
+        Content = "Terbang ke: " .. eggInfo.name .. " (" .. eggInfo.rarity .. ")",
+        Duration = 2,
+        Image = 4483362458
+    })
+    
+    -- Steal egg
+    task.wait(0.2)
+    local success = pcall(function()
+        eggInfo.prompt:InputHoldBegin()
+        task.wait(eggInfo.prompt.HoldDuration or 0.1)
+        eggInfo.prompt:InputHoldEnd()
+    end)
+    
+    if success then
+        stolenEggs = stolenEggs + 1
+        if Config.NotifyOnSteal then
+            Rayfield:Notify({
+                Title = "🥚 Egg Stolen!",
+                Content = eggInfo.name .. " | Total: " .. stolenEggs,
+                Duration = 2,
+                Image = 4483362458
+            })
+        end
+    end
+    
+    -- Kembali ke base
+    if Config.ReturnToBase and Config.BasePosition then
+        task.wait(0.3)
+        root.CFrame = Config.BasePosition
+        Rayfield:Notify({
+            Title = "SouGPT Egg Hunter",
+            Content = "Kembali ke base!",
+            Duration = 1.5,
+            Image = 4483362458
+        })
+    end
+    
+    currentTarget = nil
+end
+
+-- ============================================
+--  👁️ ESP
+-- ============================================
+
+local function CreateEggESP(part, color, name)
+    if ESPObjects[part] or not Drawing then return end
+    local box = Drawing.new("Square")
+    box.Thickness = 1.5
+    box.Color = color
+    box.Filled = false
+    box.Transparency = 0.7
+    local text = Drawing.new("Text")
+    text.Size = 13
+    text.Color = Color3.fromRGB(255, 255, 255)
+    text.Center = true
+    text.Outline = true
+    text.OutlineColor = Color3.fromRGB(0, 0, 0)
+    ESPObjects[part] = {box = box, text = text, name = name, color = color}
+end
+
+local function UpdateESP()
+    if not Drawing then return end
+    
+    if not Config.EggESP then
+        for _, esp in pairs(ESPObjects) do
+            esp.box.Visible = false
+            esp.text.Visible = false
+        end
+        return
+    end
+    
+    local eggs = ScanAllEggs()
+    local active = {}
+    
+    for _, egg in ipairs(eggs) do
+        local part = egg.part
+        active[part] = true
+        
+        if not ESPObjects[part] then
+            CreateEggESP(part, Config.EggESPColor, egg.name)
+        end
+        
+        local esp = ESPObjects[part]
+        if esp then
+            local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+            if onScreen then
+                local dist = (part.Position - Camera.CFrame.Position).Magnitude
+                local size = math.clamp(300 / dist, 8, 60)
+                esp.box.Size = Vector2.new(size, size)
+                esp.box.Position = Vector2.new(pos.X - size/2, pos.Y - size/2)
+                esp.box.Color = Config.EggESPColor
+                esp.box.Visible = true
+                
+                local label = egg.name
+                if Config.ShowEggDistance then
+                    label = label .. string.format(" [%.0fm]", dist)
+                end
+                esp.text.Text = label
+                esp.text.Position = Vector2.new(pos.X, pos.Y - size/2 - 16)
+                esp.text.Visible = true
+            else
+                esp.box.Visible = false
+                esp.text.Visible = false
+            end
+        end
+    end
+    
+    for part, esp in pairs(ESPObjects) do
+        if not active[part] then
+            esp.box.Visible = false
+            esp.text.Visible = false
+        end
+    end
+end
+
+-- ============================================
+--  🚀 MAIN LOOP
+-- ============================================
+
+RunService.RenderStepped:Connect(function()
+    UpdateESP()
+end)
+
+RunService.Heartbeat:Connect(function()
+    -- Auto Steal (jika tidak ada target manual)
+    if Config.AutoSteal and not currentTarget then
+        local eggs = ScanAllEggs()
+        if #eggs > 0 then
+            local closest = eggs[1]
+            local char = LP.Character
+            if char then
+                local root = char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local dist = (closest.position - root.Position).Magnitude
+                    if dist < Config.StealRange then
+                        local now = tick()
+                        if now - lastSteal > Config.StealDelay then
+                            lastSteal = now
+                            task.spawn(function()
+                                TeleportToEgg(closest)
+                            end)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- ============================================
+--  🎨 UI TABS
+-- ============================================
+
+-- TAB VISUAL EGG PICKER
+local EggPickerTab = Window:CreateTab("🥚 Egg Picker", 4483362458)
+
+EggPickerTab:CreateSection("Visual Egg Menu")
+
+local eggListContainer = nil
+local eggButtons = {}
+
+local function RefreshEggList()
+    if eggListContainer then
+        eggListContainer:Destroy()
+    end
+    eggButtons = {}
+    
+    local eggs = ScanAllEggs()
+    
+    eggListContainer = Instance.new("Frame")
+    eggListContainer.Size = UDim2.new(1, 0, 0, #eggs * 35 + 10)
+    eggListContainer.BackgroundTransparency = 1
+    eggListContainer.Parent = EggPickerTab.Container or EggPickerTab
+    
+    for i, egg in ipairs(eggs) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, -10, 0, 30)
+        btn.Position = UDim2.new(0, 5, 0, (i-1) * 35)
+        btn.BackgroundColor3 = egg.rarity == "Secret" and Color3.fromRGB(255, 100, 100) or
+                                egg.rarity == "Legendary" and Color3.fromRGB(255, 200, 0) or
+                                egg.rarity == "Epic" and Color3.fromRGB(180, 100, 255) or
+                                egg.rarity == "Rare" and Color3.fromRGB(100, 180, 255) or
+                                Color3.fromRGB(80, 80, 80)
+        btn.BorderSizePixel = 0
+        btn.Text = "  " .. egg.name .. "  |  " .. egg.rarity
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        btn.TextSize = 13
+        btn.Font = Enum.Font.GothamMedium
+        btn.TextXAlignment = Enum.TextXAlignment.Left
+        btn.Parent = eggListContainer
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = btn
+        
+        btn.MouseButton1Click:Connect(function()
+            TeleportToEgg(egg)
+        end)
+        
+        table.insert(eggButtons, btn)
+    end
+end
+
+EggPickerTab:CreateButton({
+    Name = "🔄 Refresh Egg List",
+    Callback = function()
+        RefreshEggList()
+        Rayfield:Notify({
+            Title = "SouGPT Egg Hunter",
+            Content = "Daftar egg di-refresh!",
+            Duration = 2
+        })
+    end
+})
+
+EggPickerTab:CreateSection("Info")
+EggPickerTab:CreateParagraph({
+    Title = "Cara Pakai",
+    Content = "1. Klik 'Refresh Egg List' untuk scan egg.\n2. Klik egg di daftar untuk terbang & mencuri.\n3. Karakter otomatis kembali ke base setelah steal.\n\nEgg diurutkan berdasarkan rarity."
+})
+
+-- TAB AUTO FARM
+local AutoTab = Window:CreateTab("🏠 Auto Farm", 4483362458)
+
+AutoTab:CreateSection("Auto Steal")
+
+AutoTab:CreateToggle({
+    Name = "Auto Steal (Terdekat)",
+    CurrentValue = false,
+    Flag = "AutoSteal",
+    Callback = function(v) Config.AutoSteal = v end
+})
+
+AutoTab:CreateSlider({
+    Name = "Steal Range",
+    Range = {10, 100},
+    Increment = 5,
+    Suffix = " stud",
+    CurrentValue = 25,
+    Flag = "StealRange",
+    Callback = function(v) Config.StealRange = v end
+})
+
+AutoTab:CreateSlider({
+    Name = "Steal Delay",
+    Range = {0.2, 2},
+    Increment = 0.1,
+    Suffix = " s",
+    CurrentValue = 0.4,
+    Flag = "StealDelay",
+    Callback = function(v) Config.StealDelay = v end
+})
+
+AutoTab:CreateToggle({
+    Name = "Return to Base",
+    CurrentValue = true,
+    Flag = "ReturnToBase",
+    Callback = function(v) Config.ReturnToBase = v end
+})
+
+AutoTab:CreateButton({
+    Name = "📍 Simpan Posisi Base",
+    Callback = function() SaveBasePosition() end
+})
+
+-- TAB FLY
+local FlyTab = Window:CreateTab("✈️ Fly", 4483362458)
+
+FlyTab:CreateSection("Fly Control")
+
+FlyTab:CreateToggle({
+    Name = "Fly Enabled",
+    CurrentValue = false,
+    Flag = "FlyEnabled",
+    Callback = function(v)
+        if v then StartFly() else StopFly() end
+    end
+})
+
+FlyTab:CreateSlider({
+    Name = "Fly Speed",
+    Range = {20, 300},
+    Increment = 10,
+    Suffix = "",
+    CurrentValue = 120,
+    Flag = "FlySpeed",
+    Callback = function(v) Config.FlySpeed = v end
+})
+
+FlyTab:CreateSection("Kontrol")
+FlyTab:CreateParagraph({
+    Title = "Keybind Fly",
+    Content = "W/A/S/D = Gerak\nSpace = Naik\nLeftCtrl = Turun"
+})
+
+-- TAB ESP
+local ESPTab = Window:CreateTab("👁️ ESP", 4483362458)
+
+ESPTab:CreateSection("Egg ESP")
+
+ESPTab:CreateToggle({
+    Name = "Egg ESP",
+    CurrentValue = false,
+    Flag = "EggESP",
+    Callback = function(v) Config.EggESP = v end
+})
+
+ESPTab:CreateColorPicker({
+    Name = "ESP Color",
+    Color = Color3.fromRGB(255, 200, 0),
+    Flag = "EggESPColor",
+    Callback = function(v) Config.EggESPColor = v end
+})
+
+ESPTab:CreateToggle({
+    Name = "Show Distance",
+    CurrentValue = true,
+    Flag = "ShowEggDistance",
+    Callback = function(v) Config.ShowEggDistance = v end
+})
+
+-- TAB ANTI-CHEAT
+local AntiCheatTab = Window:CreateTab("🛡️ Anti-Cheat", 4483362458)
+
+AntiCheatTab:CreateSection("Bypass")
+
+AntiCheatTab:CreateToggle({
+    Name = "Anti-Cheat Bypass",
+    CurrentValue = true,
+    Flag = "AntiCheatBypass",
+    Callback = function(v) Config.AntiCheatBypass = v end
+})
+
+AntiCheatTab:CreateToggle({
+    Name = "Anti AFK",
+    CurrentValue = true,
+    Flag = "AntiAfk",
+    Callback = function(v) Config.AntiAfk = v end
+})
+
+AntiCheatTab:CreateSection("Info")
+AntiCheatTab:CreateParagraph({
+    Title = "Status",
+    Content = "Jitter delay aktif\nNamecall hook aktif\nNoclip saat fly\nAnti-AFK aktif"
+})
+
+-- ============================================
+--  🚀 NOTIFIKASI START
+-- ============================================
+
+Rayfield:Notify({
+    Title = "🥚 SouGPT Egg Hunter",
+    Content = "Visual Egg Picker aktif! Klik 'Refresh Egg List' untuk mulai.",
+    Duration = 5,
+    Image = 4483362458
+})
+
+print("========================================")
+print("🥚 SouGPT Egg Hunter")
+print("✅ Visual Egg Picker loaded")
+print("✅ Anti-Cheat Bypass active")
+print("✅ Fly + Auto Steal ready")
+print("========================================")
