@@ -1,0 +1,781 @@
+-- ============================================
+--  🔥 SOUGPT UNIVERSAL HUB v1.0
+--  All-in-One Modular Loader
+--  "Dibuat untuk Tuanku Xso"
+-- ============================================
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+-- ============================================
+--  ⚙️ KONFIGURASI GLOBAL
+-- ============================================
+
+getgenv().SouGPT = {
+    VERSION = "1.0.0",
+    DEVELOPER = "SouGPT",
+    USER = "Tuanku Xso",
+    LOADED_MODULES = {},
+    DEBUG = true,
+}
+
+local SouGPT = getgenv().SouGPT
+
+-- ============================================
+--  🎨 SHARED LIBRARY
+-- ============================================
+
+-- Rayfield (shared UI)
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Notifikasi helper
+local function Notify(title, content, duration)
+    Rayfield:Notify({
+        Title = title,
+        Content = content,
+        Duration = duration or 3,
+        Image = 4483362458
+    })
+end
+
+-- Drawing library
+local Drawing = Drawing or debug.getupvalue(getrenv().Drawing, 1) or Drawing
+
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local VirtualUser = game:GetService("VirtualUser")
+local LP = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- ============================================
+--  🎮 DATABASE GAME
+-- ============================================
+
+local GAME_DB = {
+    -- Blox Fruits
+    [2753915549]  = {name = "Blox Fruits", module = "bloxfruits", world = 1},
+    [4442272183]  = {name = "Blox Fruits", module = "bloxfruits", world = 2},
+    [7449423635]  = {name = "Blox Fruits", module = "bloxfruits", world = 3},
+    
+    -- Steal an Egg
+    [11112319175] = {name = "Steal an Egg", module = "stealegg"},
+    [12219158441] = {name = "Steal an Egg", module = "stealegg"},
+    
+    -- Universal (fallback)
+    [0] = {name = "Universal", module = "universal"},
+}
+
+-- ============================================
+--  🔍 DETEKSI GAME
+-- ============================================
+
+local function DetectGame()
+    local placeId = game.PlaceId
+    local gameData = GAME_DB[placeId]
+    
+    if not gameData then
+        -- Cek dari nama game
+        local success, info = pcall(function()
+            return game:GetService("MarketplaceService"):GetProductInfo(placeId)
+        end)
+        
+        if success and info then
+            local name = info.Name:lower()
+            if name:find("blox") and name:find("fruit") then
+                return {name = "Blox Fruits (Detected)", module = "bloxfruits"}
+            elseif name:find("steal") and name:find("egg") then
+                return {name = "Steal an Egg (Detected)", module = "stealegg"}
+            end
+        end
+        
+        return {name = "Unknown Game", module = "universal"}
+    end
+    
+    return gameData
+end
+
+-- ============================================
+--  📦 MODULE: BLOX FRUITS
+-- ============================================
+
+local function LoadBloxFruitsModule()
+    SouGPT.LOADED_MODULES.bloxfruits = true
+    
+    getgenv().BF = {
+        AutoFarm = false, AutoBoss = false, AutoHaki = false,
+        KillAura = false, KillAuraRange = 30,
+        SpeedEnabled = false, SpeedValue = 100,
+        InfiniteJump = false, FlyEnabled = false, FlySpeed = 150,
+        FruitESP = false, ChestESP = false, PlayerESP = false,
+        ESPColor = Color3.fromRGB(255, 100, 100),
+        AntiAfk = true,
+    }
+    local C = getgenv().BF
+    
+    -- Anti AFK
+    if C.AntiAfk then
+        LP.Idled:Connect(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+        end)
+    end
+    
+    -- Core functions
+    local function TeleportTo(pos)
+        local char = LP.Character
+        if not char then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if root then root.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0)) end
+    end
+    
+    local function GetNearestMob(range)
+        range = range or 150
+        local char = LP.Character
+        if not char then return nil end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then return nil end
+        
+        local nearest, nd = nil, range
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("Model") and obj ~= char then
+                local hum = obj:FindFirstChildOfClass("Humanoid")
+                local hrp = obj:FindFirstChild("HumanoidRootPart")
+                if hum and hrp and hum.Health > 0 then
+                    local d = (hrp.Position - root.Position).Magnitude
+                    if d < nd then nd = d; nearest = obj end
+                end
+            end
+        end
+        return nearest
+    end
+    
+    local function AttackMob(mob)
+        if not mob then return end
+        local char = LP.Character
+        if not char then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local mobRoot = mob:FindFirstChild("HumanoidRootPart")
+        if not root or not mobRoot then return end
+        
+        root.CFrame = CFrame.new(mobRoot.Position + Vector3.new(0, 5, 0), mobRoot.Position)
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool then tool:Activate() end
+    end
+    
+    -- Farm loop
+    RunService.Heartbeat:Connect(function()
+        if C.AutoFarm then
+            local mob = GetNearestMob(150)
+            if mob then AttackMob(mob) end
+        end
+    end)
+    
+    -- ESP
+    local ESPObjects = {}
+    local function CreateESP(part, color, name)
+        if ESPObjects[part] or not Drawing then return end
+        local box = Drawing.new("Square")
+        box.Thickness = 1.5; box.Color = color; box.Filled = false; box.Transparency = 0.7
+        local text = Drawing.new("Text")
+        text.Size = 13; text.Color = Color3.fromRGB(255,255,255)
+        text.Center = true; text.Outline = true
+        text.OutlineColor = Color3.fromRGB(0,0,0)
+        ESPObjects[part] = {box = box, text = text}
+    end
+    
+    RunService.RenderStepped:Connect(function()
+        if not Drawing then return end
+        for _, esp in pairs(ESPObjects) do
+            esp.box.Visible = false
+            esp.text.Visible = false
+        end
+        
+        if C.FruitESP then
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("Tool") and obj.Name:lower():find("fruit") then
+                    local handle = obj:FindFirstChild("Handle")
+                    if handle then
+                        if not ESPObjects[handle] then CreateESP(handle, C.ESPColor, obj.Name) end
+                        local esp = ESPObjects[handle]
+                        if esp then
+                            local pos, onScreen = Camera:WorldToViewportPoint(handle.Position)
+                            if onScreen then
+                                local d = (handle.Position - Camera.CFrame.Position).Magnitude
+                                esp.text.Text = "🍎 " .. obj.Name .. string.format(" [%.0fm]", d)
+                                esp.text.Position = Vector2.new(pos.X, pos.Y - 20)
+                                esp.text.Visible = true
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        
+        if C.PlayerESP then
+            for _, plr in ipairs(Players:GetPlayers()) do
+                if plr ~= LP and plr.Character then
+                    local head = plr.Character:FindFirstChild("Head")
+                    if head then
+                        if not ESPObjects[head] then CreateESP(head, Color3.fromRGB(0,255,0), plr.Name) end
+                        local esp = ESPObjects[head]
+                        if esp then
+                            local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                            if onScreen then
+                                esp.text.Text = plr.Name
+                                esp.text.Position = Vector2.new(pos.X, pos.Y - 20)
+                                esp.text.Visible = true
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+    
+    -- Movement
+    RunService.Heartbeat:Connect(function()
+        if C.SpeedEnabled then
+            local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+            if hum then hum.WalkSpeed = C.SpeedValue end
+        end
+    end)
+    
+    UserInputService.JumpRequest:Connect(function()
+        if C.InfiniteJump then
+            local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+            if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+        end
+    end)
+    
+    -- UI
+    local Tab = Rayfield:CreateTab("🌊 Blox Fruits", 4483362458)
+    Tab:CreateSection("Auto Farm")
+    Tab:CreateToggle({Name = "Auto Farm Nearest", CurrentValue = false, Flag = "BF_AutoFarm",
+        Callback = function(v) C.AutoFarm = v end})
+    Tab:CreateSection("Combat")
+    Tab:CreateToggle({Name = "Kill Aura", CurrentValue = false, Flag = "BF_KillAura",
+        Callback = function(v) C.KillAura = v end})
+    Tab:CreateSlider({Name = "Kill Aura Range", Range = {10,100}, Increment = 5, Suffix = " stud",
+        CurrentValue = 30, Flag = "BF_KillRange",
+        Callback = function(v) C.KillAuraRange = v end})
+    Tab:CreateSection("Movement")
+    Tab:CreateToggle({Name = "Speed", CurrentValue = false, Flag = "BF_Speed",
+        Callback = function(v) C.SpeedEnabled = v end})
+    Tab:CreateSlider({Name = "Speed Value", Range = {16,500}, Increment = 1, Suffix = "",
+        CurrentValue = 100, Flag = "BF_SpeedVal",
+        Callback = function(v) C.SpeedValue = v end})
+    Tab:CreateToggle({Name = "Infinite Jump", CurrentValue = false, Flag = "BF_InfJump",
+        Callback = function(v) C.InfiniteJump = v end})
+    Tab:CreateSection("ESP")
+    Tab:CreateToggle({Name = "Fruit ESP", CurrentValue = false, Flag = "BF_FruitESP",
+        Callback = function(v) C.FruitESP = v end})
+    Tab:CreateToggle({Name = "Player ESP", CurrentValue = false, Flag = "BF_PlayerESP",
+        Callback = function(v) C.PlayerESP = v end})
+    
+    Notify("🌊 Blox Fruits Module", "Loaded! Equip tool dulu sebelum auto farm.")
+end
+
+-- ============================================
+--  📦 MODULE: STEAL AN EGG
+-- ============================================
+
+local function LoadStealEggModule()
+    SouGPT.LOADED_MODULES.stealegg = true
+    
+    getgenv().SE = {
+        AutoSteal = false, StealRange = 15, StealDelay = 0.3,
+        AutoPlace = false, AutoHatch = false,
+        ESP = false, ESPColor = Color3.fromRGB(255, 200, 0),
+        SpeedEnabled = false, SpeedValue = 100,
+        FlyEnabled = false, FlySpeed = 120, Noclip = false,
+        ReturnToBase = true, BasePosition = nil,
+        AntiAfk = true,
+    }
+    local C = getgenv().SE
+    
+    -- Anti AFK
+    if C.AntiAfk then
+        LP.Idled:Connect(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+        end)
+    end
+    
+    -- Egg detection
+    local function GetAllEggPrompts()
+        local prompts = {}
+        local function scan(obj)
+            if obj:IsA("ProximityPrompt") then
+                local a = obj.ActionText:lower()
+                local o = obj.ObjectText:lower()
+                if a:find("steal") or a:find("egg") or a:find("take") or o:find("egg") then
+                    table.insert(prompts, obj)
+                end
+            end
+            for _, c in ipairs(obj:GetChildren()) do scan(c) end
+        end
+        scan(workspace)
+        return prompts
+    end
+    
+    local function GetClosestEgg()
+        local closest, shortest = nil, C.StealRange
+        local char = LP.Character
+        if not char then return nil end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then return nil end
+        for _, p in ipairs(GetAllEggPrompts()) do
+            local part = p.Parent
+            if part and part:IsA("BasePart") then
+                local d = (part.Position - root.Position).Magnitude
+                if d < shortest then shortest = d; closest = p end
+            end
+        end
+        return closest
+    end
+    
+    local function GetPlacePrompt()
+        local char = LP.Character
+        if not char then return nil end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then return nil end
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("ProximityPrompt") then
+                local a = obj.ActionText:lower()
+                if a:find("place") or a:find("hatch") or a:find("incubat") then
+                    local part = obj.Parent
+                    if part and part:IsA("BasePart") then
+                        local d = (part.Position - root.Position).Magnitude
+                        if d < 25 then return obj end
+                    end
+                end
+            end
+        end
+        return nil
+    end
+    
+    local lastSteal = 0
+    local stolenEggs = 0
+    
+    local function StealEgg(prompt)
+        if not prompt then return end
+        local now = tick()
+        if now - lastSteal < C.StealDelay then return end
+        lastSteal = now
+        pcall(function()
+            prompt:InputHoldBegin()
+            task.wait(prompt.HoldDuration or 0.1)
+            prompt:InputHoldEnd()
+        end)
+        stolenEggs = stolenEggs + 1
+    end
+    
+    -- Anti-cheat: namecall hook
+    pcall(function()
+        local oldNC
+        oldNC = hookmetamethod(game, "__namecall", function(self, ...)
+            local m = getnamecallmethod()
+            if m == "FireServer" then
+                local s = tostring(self):lower()
+                if s:find("kick") or s:find("anticheat") then return end
+            end
+            return oldNC(self, ...)
+        end)
+    end)
+    
+    -- Fly
+    local flyConn = nil
+    local function ToggleFly(state)
+        C.FlyEnabled = state
+        local char = LP.Character
+        if not char then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not root or not hum then return end
+        
+        if state then
+            local bv = Instance.new("BodyVelocity", root)
+            bv.Name = "SGPT_Fly"; bv.MaxForce = Vector3.new(1e5,1e5,1e5); bv.Velocity = Vector3.zero
+            local bg = Instance.new("BodyGyro", root)
+            bg.Name = "SGPT_Gyro"; bg.MaxTorque = Vector3.new(1e5,1e5,1e5); bg.P = 1000; bg.CFrame = root.CFrame
+            hum.PlatformStand = true
+            
+            flyConn = RunService.RenderStepped:Connect(function()
+                if not C.FlyEnabled then return end
+                local mv = Vector3.zero
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then mv += Camera.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then mv -= Camera.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then mv -= Camera.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then mv += Camera.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then mv += Vector3.new(0,1,0) end
+                if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then mv -= Vector3.new(0,1,0) end
+                bv.Velocity = mv.Magnitude > 0 and mv.Unit * C.FlySpeed or Vector3.zero
+                bg.CFrame = Camera.CFrame
+            end)
+        else
+            if flyConn then flyConn:Disconnect() flyConn = nil end
+            local bv = root:FindFirstChild("SGPT_Fly")
+            local bg = root:FindFirstChild("SGPT_Gyro")
+            if bv then bv:Destroy() end
+            if bg then bg:Destroy() end
+            hum.PlatformStand = false
+        end
+    end
+    
+    -- ESP
+    local ESPObjects = {}
+    RunService.RenderStepped:Connect(function()
+        if not Drawing then return end
+        for _, esp in pairs(ESPObjects) do
+            esp.box.Visible = false
+            esp.text.Visible = false
+        end
+        
+        if C.ESP then
+            for _, p in ipairs(GetAllEggPrompts()) do
+                local part = p.Parent
+                if part and part:IsA("BasePart") then
+                    if not ESPObjects[part] then
+                        local box = Drawing.new("Square")
+                        box.Thickness = 1.5; box.Color = C.ESPColor; box.Filled = false
+                        local text = Drawing.new("Text")
+                        text.Size = 13; text.Color = Color3.fromRGB(255,255,255)
+                        text.Center = true; text.Outline = true; text.OutlineColor = Color3.fromRGB(0,0,0)
+                        ESPObjects[part] = {box = box, text = text}
+                    end
+                    local esp = ESPObjects[part]
+                    local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                    if onScreen then
+                        local d = (part.Position - Camera.CFrame.Position).Magnitude
+                        local size = math.clamp(300/d, 8, 60)
+                        esp.box.Size = Vector2.new(size, size)
+                        esp.box.Position = Vector2.new(pos.X - size/2, pos.Y - size/2)
+                        esp.box.Visible = true
+                        esp.text.Text = "🥚 " .. string.format("%.0fm", d)
+                        esp.text.Position = Vector2.new(pos.X, pos.Y - size/2 - 16)
+                        esp.text.Visible = true
+                    end
+                end
+            end
+        end
+    end)
+    
+    -- Main loop
+    RunService.Heartbeat:Connect(function()
+        if C.AutoSteal then
+            local prompt = GetClosestEgg()
+            if prompt then StealEgg(prompt) end
+        end
+        if C.AutoPlace or C.AutoHatch then
+            local p = GetPlacePrompt()
+            if p then pcall(function()
+                p:InputHoldBegin(); task.wait(0.1); p:InputHoldEnd()
+            end) end
+        end
+    end)
+    
+    -- Speed
+    RunService.Heartbeat:Connect(function()
+        if C.SpeedEnabled then
+            local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+            if hum then hum.WalkSpeed = C.SpeedValue end
+        end
+    end)
+    
+    -- UI
+    local Tab = Rayfield:CreateTab("🥚 Steal an Egg", 4483362458)
+    Tab:CreateSection("Auto Steal")
+    Tab:CreateToggle({Name = "Auto Steal Egg", CurrentValue = false, Flag = "SE_AutoSteal",
+        Callback = function(v) C.AutoSteal = v end})
+    Tab:CreateSlider({Name = "Steal Range", Range = {5,50}, Increment = 1, Suffix = " stud",
+        CurrentValue = 15, Flag = "SE_Range",
+        Callback = function(v) C.StealRange = v end})
+    Tab:CreateSlider({Name = "Steal Delay", Range = {0.1,2}, Increment = 0.1, Suffix = " s",
+        CurrentValue = 0.3, Flag = "SE_Delay",
+        Callback = function(v) C.StealDelay = v end})
+    Tab:CreateSection("Auto Base")
+    Tab:CreateToggle({Name = "Auto Place", CurrentValue = false, Flag = "SE_AutoPlace",
+        Callback = function(v) C.AutoPlace = v end})
+    Tab:CreateToggle({Name = "Auto Hatch", CurrentValue = false, Flag = "SE_AutoHatch",
+        Callback = function(v) C.AutoHatch = v end})
+    Tab:CreateSection("Movement")
+    Tab:CreateToggle({Name = "Speed", CurrentValue = false, Flag = "SE_Speed",
+        Callback = function(v) C.SpeedEnabled = v end})
+    Tab:CreateSlider({Name = "Speed Value", Range = {16,300}, Increment = 1, Suffix = "",
+        CurrentValue = 100, Flag = "SE_SpeedVal",
+        Callback = function(v) C.SpeedValue = v end})
+    Tab:CreateToggle({Name = "Fly (WASD+Space/Ctrl)", CurrentValue = false, Flag = "SE_Fly",
+        Callback = function(v) ToggleFly(v) end})
+    Tab:CreateSection("ESP")
+    Tab:CreateToggle({Name = "Egg ESP", CurrentValue = false, Flag = "SE_ESP",
+        Callback = function(v) C.ESP = v end})
+    Tab:CreateColorPicker({Name = "ESP Color", Color = Color3.fromRGB(255,200,0), Flag = "SE_ESPColor",
+        Callback = function(v) C.ESPColor = v end})
+    
+    Notify("🥚 Steal an Egg Module", "Loaded! Anti-cheat bypass aktif.")
+end
+
+-- ============================================
+--  📦 MODULE: UNIVERSAL (Aimbot + ESP)
+-- ============================================
+
+local function LoadUniversalModule()
+    SouGPT.LOADED_MODULES.universal = true
+    
+    getgenv().UNI = {
+        Aimbot = false, FOV = 150, Smoothness = 0.15,
+        AimKey = Enum.UserInputType.MouseButton2,
+        TeamCheck = true, Prediction = 0.12,
+        ESP = false, BoxColor = Color3.fromRGB(0,255,0),
+        ShowName = true, ShowHealth = true, ShowDistance = true,
+        SpeedEnabled = false, SpeedValue = 100,
+        FlyEnabled = false, FlySpeed = 150,
+    }
+    local C = getgenv().UNI
+    
+    local aimHeld = false
+    local ESPObjects = {}
+    
+    -- Aimbot
+    local function GetTarget()
+        local closest, shortest = nil, C.FOV * 2
+        local center = Camera.ViewportSize / 2
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p == LP or not p.Character then continue end
+            if C.TeamCheck and p.Team == LP.Team then continue end
+            local head = p.Character:FindFirstChild("Head")
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            if not head or not hum or hum.Health <= 0 then continue end
+            local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+            if not onScreen then continue end
+            local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+            if d < shortest then shortest = d; closest = {pos = head.Position} end
+        end
+        return closest
+    end
+    
+    RunService.RenderStepped:Connect(function()
+        if C.Aimbot and aimHeld then
+            local t = GetTarget()
+            if t then
+                local look = CFrame.lookAt(Camera.CFrame.Position, t.pos)
+                Camera.CFrame = Camera.CFrame:Lerp(look, C.Smoothness)
+            end
+        end
+    end)
+    
+    UserInputService.InputBegan:Connect(function(i, g)
+        if g then return end
+        if i.UserInputType == C.AimKey then aimHeld = true end
+    end)
+    UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType == C.AimKey then aimHeld = false end
+    end)
+    
+    -- ESP
+    RunService.RenderStepped:Connect(function()
+        if not Drawing then return end
+        for _, esp in pairs(ESPObjects) do
+            esp.box.Visible = false; esp.text.Visible = false
+        end
+        if not C.ESP then return end
+        
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p == LP or not p.Character then continue end
+            local head = p.Character:FindFirstChild("Head")
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            if not head or not hum then continue end
+            
+            if not ESPObjects[p] then
+                local box = Drawing.new("Square")
+                box.Thickness = 1.5; box.Color = C.BoxColor; box.Filled = false
+                local text = Drawing.new("Text")
+                text.Size = 13; text.Color = Color3.fromRGB(255,255,255)
+                text.Center = true; text.Outline = true; text.OutlineColor = Color3.fromRGB(0,0,0)
+                ESPObjects[p] = {box = box, text = text}
+            end
+            
+            local esp = ESPObjects[p]
+            local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+            if onScreen then
+                local d = (head.Position - Camera.CFrame.Position).Magnitude
+                local size = math.clamp(400/d, 15, 100)
+                esp.box.Size = Vector2.new(size*0.5, size)
+                esp.box.Position = Vector2.new(pos.X - size*0.25, pos.Y - size*0.5)
+                esp.box.Visible = true
+                
+                local label = ""
+                if C.ShowName then label = p.Name end
+                if C.ShowHealth then label = label .. " [" .. math.floor(hum.Health) .. "]" end
+                if C.ShowDistance then label = label .. string.format(" %.0fm", d) end
+                esp.text.Text = label
+                esp.text.Position = Vector2.new(pos.X, pos.Y - size*0.5 - 16)
+                esp.text.Visible = true
+            end
+        end
+    end)
+    
+    -- UI
+    local Tab = Rayfield:CreateTab("🎯 Universal", 4483362458)
+    Tab:CreateSection("Aimbot")
+    Tab:CreateToggle({Name = "Aimbot", CurrentValue = false, Flag = "UNI_Aimbot",
+        Callback = function(v) C.Aimbot = v end})
+    Tab:CreateSlider({Name = "FOV", Range = {10,500}, Increment = 5, Suffix = " px",
+        CurrentValue = 150, Flag = "UNI_FOV",
+        Callback = function(v) C.FOV = v end})
+    Tab:CreateSlider({Name = "Smoothness", Range = {0,1}, Increment = 0.01, Suffix = "",
+        CurrentValue = 0.15, Flag = "UNI_Smooth",
+        Callback = function(v) C.Smoothness = v end})
+    Tab:CreateSection("ESP")
+    Tab:CreateToggle({Name = "ESP", CurrentValue = false, Flag = "UNI_ESP",
+        Callback = function(v) C.ESP = v end})
+    Tab:CreateToggle({Name = "Show Name", CurrentValue = true, Flag = "UNI_Name",
+        Callback = function(v) C.ShowName = v end})
+    Tab:CreateToggle({Name = "Show Health", CurrentValue = true, Flag = "UNI_Health",
+        Callback = function(v) C.ShowHealth = v end})
+    Tab:CreateToggle({Name = "Show Distance", CurrentValue = true, Flag = "UNI_Dist",
+        Callback = function(v) C.ShowDistance = v end})
+    
+    Notify("🎯 Universal Module", "Aimbot + ESP loaded.")
+end
+
+-- ============================================
+--  📦 MODULE: IMAGE DRAWER
+-- ============================================
+
+local function LoadImageDrawer()
+    SouGPT.LOADED_MODULES.imagedrawer = true
+    
+    local Tab = Rayfield:CreateTab("🖼️ Image Drawer", 4483362458)
+    
+    Tab:CreateSection("Tampilkan Gambar")
+    Tab:CreateInput({
+        Name = "URL Gambar",
+        PlaceholderText = "https://i.imgur.com/xxx.png",
+        RemoveTextAfterFocusLost = false,
+        Flag = "ImgURL",
+        Callback = function(text)
+            getgenv().SGPT_ImgURL = text
+        end
+    })
+    Tab:CreateButton({
+        Name = "🖼️ Tampilkan",
+        Callback = function()
+            local url = getgenv().SGPT_ImgURL
+            if not url or url == "" then
+                Notify("🖼️ Image Drawer", "URL kosong!")
+                return
+            end
+            local PlayerGui = LP:WaitForChild("PlayerGui")
+            local old = PlayerGui:FindFirstChild("SGPT_ImgDrawer")
+            if old then old:Destroy() end
+            
+            local sg = Instance.new("ScreenGui")
+            sg.Name = "SGPT_ImgDrawer"; sg.ResetOnSpawn = false
+            sg.IgnoreGuiInset = true; sg.Parent = PlayerGui
+            
+            local frame = Instance.new("Frame")
+            frame.Size = UDim2.new(0, 300, 0, 300)
+            frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+            frame.AnchorPoint = Vector2.new(0.5, 0.5)
+            frame.BackgroundColor3 = Color3.fromRGB(20,20,25)
+            frame.Active = true; frame.Draggable = true
+            frame.Parent = sg
+            
+            Instance.new("UICorner", frame).CornerRadius = UDim.new(0,12)
+            local stroke = Instance.new("UIStroke", frame)
+            stroke.Color = Color3.fromRGB(80,80,100); stroke.Thickness = 2
+            
+            local img = Instance.new("ImageLabel")
+            img.Size = UDim2.new(1,-10,1,-10)
+            img.Position = UDim2.new(0.5,0,0.5,0)
+            img.AnchorPoint = Vector2.new(0.5,0.5)
+            img.BackgroundTransparency = 1
+            img.Image = url; img.ScaleType = Enum.ScaleType.Fit
+            img.Parent = frame
+            Instance.new("UICorner", img).CornerRadius = UDim.new(0,10)
+            
+            local close = Instance.new("TextButton")
+            close.Size = UDim2.new(0,30,0,30)
+            close.Position = UDim2.new(1,5,0,-5)
+            close.BackgroundColor3 = Color3.fromRGB(220,50,50)
+            close.Text = "✕"; close.TextColor3 = Color3.fromRGB(255,255,255)
+            close.TextSize = 18; close.Font = Enum.Font.GothamBold
+            close.BorderSizePixel = 0; close.Parent = frame
+            Instance.new("UICorner", close).CornerRadius = UDim.new(0,15)
+            close.MouseButton1Click:Connect(function() sg:Destroy() end)
+            
+            Notify("🖼️ Image Drawer", "Gambar ditampilkan!")
+        end
+    })
+    Tab:CreateSection("Info")
+    Tab:CreateParagraph({
+        Title = "Cara Pakai",
+        Content = "Paste URL gambar direct (.png/.jpg/.gif).\nKlik Tampilkan. Gambar bisa di-drag."
+    })
+end
+
+-- ============================================
+--  🚀 EKSEKUSI UTAMA
+-- ============================================
+
+-- Splash
+print("========================================")
+print("🔥 SOUGPT UNIVERSAL HUB v" .. SouGPT.VERSION)
+print("👤 User: " .. SouGPT.USER)
+print("🎮 Game: " .. game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name)
+print("========================================")
+
+-- Deteksi game
+local gameInfo = DetectGame()
+print("📦 Module: " .. gameInfo.module)
+
+-- Load module sesuai game
+if gameInfo.module == "bloxfruits" then
+    LoadBloxFruitsModule()
+elseif gameInfo.module == "stealegg" then
+    LoadStealEggModule()
+else
+    -- Unknown game = load universal (aimbot + ESP)
+    LoadUniversalModule()
+end
+
+-- Selalu load Image Drawer (universal)
+LoadImageDrawer()
+
+-- ============================================
+--  🎨 TAB INFO (selalu ada)
+-- ============================================
+
+local InfoTab = Rayfield:CreateTab("ℹ️ Info", 4483362458)
+
+InfoTab:CreateSection("SouGPT Universal Hub")
+InfoTab:CreateParagraph({
+    Title = "Detail",
+    Content = "Version: " .. SouGPT.VERSION .. "\nDeveloper: " .. SouGPT.DEVELOPER ..
+              "\nUser: " .. SouGPT.USER .. "\nGame: " .. gameInfo.name ..
+              "\nModule: " .. gameInfo.module
+})
+
+InfoTab:CreateSection("Modules Loaded")
+local moduleText = ""
+for name, _ in pairs(SouGPT.LOADED_MODULES) do
+    moduleText = moduleText .. "✅ " .. name .. "\n"
+end
+InfoTab:CreateParagraph({
+    Title = "Status",
+    Content = moduleText ~= "" and moduleText or "Tidak ada module."
+})
+
+InfoTab:CreateSection("Kontrol")
+InfoTab:CreateParagraph({
+    Title = "Keybind",
+    Content = "Aimbot: Klik Kanan (MouseButton2)\nFly: WASD + Space/Ctrl\nImage Drawer: Drag untuk pindah"
+})
+
+-- Notifikasi selesai
+Notify("🔥 SouGPT Universal Hub", "Loaded! Game: " .. gameInfo.name .. " | Module: " .. gameInfo.module, 5)
+
+print("✅ All modules loaded successfully.")
+print("========================================")
