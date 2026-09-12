@@ -1,0 +1,163 @@
+--[[
+    SERVER HOPPER - STEAL AN EGG
+    Support: Delta Executor, Solara, Codex, Arceus X, Swift
+    Fungsi : Mencari server dengan sedikit pemain (prioritas 1 orang)
+--]]
+
+-- ================= KONFIGURASI =================
+local CONFIG = {
+    PlaceId      = game.PlaceId,
+    MaxPlayers   = 2,       -- Maksimal pemain di server target
+    PreferOne    = true,    -- Prioritaskan server 1 orang
+    MaxRetries   = 10,      -- Maksimal percobaan
+    DelayRetry   = 2,       -- Jeda antar percobaan (detik)
+    AutoRejoin   = true,    -- Auto hop jika server penuh
+    Webhook      = "",      -- (Optional) Discord webhook log
+}
+-- ==============================================
+
+local TeleportService = game:GetService("TeleportService")
+local HttpService     = game:GetService("HttpService")
+local Players         = game:GetService("Players")
+local StarterGui      = game:GetService("StarterGui")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- ================= UTIL =================
+local function notify(title, text, dur)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = title,
+            Text = text,
+            Duration = dur or 3,
+        })
+    end)
+end
+
+local function log(...)
+    print("[ServerHop]", ...)
+end
+
+-- ================= AMBIL DAFTAR SERVER =================
+local function fetchServers(cursor)
+    local url = string.format(
+        "https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Asc&limit=100%s",
+        CONFIG.PlaceId,
+        cursor and ("&cursor=" .. cursor) or ""
+    )
+
+    local ok, result = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet(url))
+    end)
+
+    if ok and result and result.data then
+        return result.data, result.nextPageCursor
+    end
+    return {}, nil
+end
+
+-- ================= CARI SERVER TERBAIK =================
+local function findBestServer()
+    local allServers = {}
+    local cursor = nil
+    local pages = 0
+
+    repeat
+        local servers, nextCursor = fetchServers(cursor)
+        for _, s in ipairs(servers) do
+            table.insert(allServers, s)
+        end
+        cursor = nextCursor
+        pages = pages + 1
+    until not cursor or pages >= 3
+
+    local best, bestCount = nil, math.huge
+
+    for _, s in ipairs(allServers) do
+        local playing = tonumber(s.playing) or 0
+        local maxP    = tonumber(s.maxPlayers) or 0
+
+        -- Skip server sendiri & server penuh
+        if s.id ~= game.JobId and playing < maxP and playing > 0 then
+            -- Prioritas 1 orang
+            if CONFIG.PreferOne and playing == 1 then
+                return s
+            end
+
+            if playing <= CONFIG.MaxPlayers and playing < bestCount then
+                best, bestCount = s, playing
+            end
+        end
+    end
+
+    return best
+end
+
+-- ================= TELEPORT =================
+local function hopTo(server)
+    if not server then
+        notify("Server Hop", "Tidak ada server ditemukan 😢", 4)
+        return false
+    end
+
+    notify("Server Hop", string.format("Pindah ke server %d pemain...", server.playing), 3)
+    log("Target:", server.id, "Players:", server.playing)
+
+    local ok, err = pcall(function()
+        TeleportService:TeleportToPlaceInstance(
+            CONFIG.PlaceId,
+            server.id,
+            LocalPlayer
+        )
+    end)
+
+    if not ok then
+        warn("[ServerHop] Teleport gagal:", err)
+        return false
+    end
+    return true
+end
+
+-- ================= MAIN LOOP =================
+local function main()
+    notify("Server Hop", "Mencari server kosong...", 3)
+    log("Mulai mencari server...")
+
+    for attempt = 1, CONFIG.MaxRetries do
+        log(string.format("Percobaan %d/%d", attempt, CONFIG.MaxRetries))
+
+        local target = findBestServer()
+
+        if target then
+            log(string.format("Ditemukan! Server %s (%d pemain)",
+                target.id, target.playing))
+
+            if hopTo(target) then
+                return
+            end
+        else
+            log("Server tidak ditemukan, coba lagi...")
+        end
+
+        task.wait(CONFIG.DelayRetry)
+    end
+
+    notify("Server Hop", "Gagal menemukan server setelah " ..
+        CONFIG.MaxRetries .. " percobaan", 5)
+end
+
+-- ================= ANTI-AFK =================
+local function antiAFK()
+    pcall(function()
+        local vu = game:GetService("VirtualUser")
+        LocalPlayer.Idled:Connect(function()
+            vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+            task.wait(1)
+            vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+        end)
+    end)
+end
+
+-- ================= JALANKAN =================
+antiAFK()
+main()
