@@ -1,0 +1,762 @@
+-- ============================================
+--  🥚 SOUGPT HUB x CLOVER STYLE
+--  VM-Based Obfuscated Loader
+--  For: Steal an Egg
+--  "Dibuat untuk Tuanku Xso"
+-- ============================================
+
+return(function(...)
+    -- ========== VM HANDLERS (Clover Style) ==========
+    local VM = {
+        -- Handler 1: Main Dispatcher
+        h = function(P, k, m, o, Z)
+            k[17] = Z.readi16
+            k[0x12] = nil
+            k[19] = nil
+            k[0x14] = nil
+            m = 78
+            while true do
+                if m > 78 then
+                    k[0x13] = P.T.gsub
+                    if not o[0x50ad] then
+                        m = P:g(m, o)
+                    else
+                        m = o[20653]
+                    end
+                elseif m > 0x30 and m < 85 then
+                    k[18] = P.f
+                    if not (not o[0x1D06]) then
+                        m = o[0x1D06]
+                    else
+                        m = P:y(m, o)
+                    end
+                    goto continue
+                else
+                    if not (m < 0x4e) then
+                    else
+                        P:p(Z, k)
+                        break
+                    end
+                end
+                ::continue::
+            end
+            return m
+        end,
+        
+        Vr = function(P, _, k, m, o)
+            k[m] = P[0x8][o]
+        end,
+        
+        Gr = function(P, _, k, m, o)
+            k = #m
+            m[k + 1] = P
+            o = 0x3b
+            return k, o
+        end,
+        
+        O = function(P)
+            return P[0x4082]
+        end,
+        
+        P = function(P, k, m, o, Z)
+            k[15] = o[P.b]
+            if not (not Z[30083]) then
+                m = P:s(Z, m)
+            else
+                m = -609402790 + P.Vx(P.Wx(P.ix(m, P.Ox('\62i\u{38}', "\u{0}\z\0\0\0\x00\0\z  \0\13")) + P.d[1]), 18)
+                Z[30083] = m
+            end
+            return m
+        end,
+        
+        Xx = function(P, k, m, o, Z, l)
+            local d, f, W, F = 45
+            while true do
+                if d == 40 then
+                    m = Z[0x35]() - 14077
+                    d = 0x67
+                    goto continue
+                elseif d == 0x2D then
+                    for U = 1, o, 1 do
+                        local O, T
+                        f, T, O, W = P:_x(Z, T, o, O)
+                        if f == -2 then
+                            return m, -2, l, W
+                        elseif f == -1 then
+                            return m, -1, l
+                        end
+                        T = P:Px(T, Z, k, U, O)
+                    end
+                    d = 0x28
+                else
+                    if d == 103 then
+                        F = Z[57](m)
+                        break
+                    end
+                end
+                ::continue::
+            end
+            Z[0x2d] = Z[0x29](m * 3)
+            for P = 1, m do
+                F[P] = Z[61]()
+            end
+            l = nil
+            d = 0x7C
+            repeat
+                if d == 124 then
+                    d = 43
+                    for P = 1, #Z[0x2D], 3 do
+                        Z[0x2D][P][Z[0x2d][P + 1]] = F[Z[0x2d][P + 2]]
+                    end
+                    goto continue
+                elseif d == 14 then
+                    l = F[Z[0x35]()]
+                    break
+                else
+                    if d == 43 then
+                        d = 14
+                        if k then
+                            W = 0xE4
+                            if W ~= 0xE4 then
+                            else
+                                for P = 12, 122, 110 do
+                                    if P == 0xC then
+                                        Z[36][2] = Z[8]
+                                        goto continue
+                                    else
+                                        if P ~= 0x7a then
+                                        else
+                                            Z[36][3] = F
+                                        end
+                                    end
+                                    ::continue::
+                                end
+                            end
+                        end
+                    end
+                    goto continue
+                end
+                ::continue::
+            until false
+            return m, nil, l
+        end,
+        
+        rx = bit32.bnot,
+        
+        hr = function(P, _, k, m)
+            P[k] = k + m
+        end,
+        
+        qr = function(P)
+            return
+        end,
+        
+        Dr = function(P, k)
+            local m, o, Z = 0
+            for l = 101, 257, 55 do
+                if l < 220 then
+                    m, o, Z = P:Cr(k, Z, m)
+                    if o ~= -1 then
+                    else
+                        return -1
+                    end
+                else
+                    return -2, m
+                end
+            end
+            return nil
+        end,
+        
+        S = bit32,
+        
+        vr = function(P, k, m, o)
+            local Z
+            repeat
+                Z, m = P:br(k, m, o)
+                if Z ~= 50972 then
+                else
+                    break
+                end
+            until false
+            k[49] = (function()
+                local l = k[0x11](k[44], k[14])
+                k[14] = k[14] + 2
+                return l
+            end)
+            k[0x32] = nil
+            k[57] = nil
+            k[0x34] = nil
+            k[0x35] = nil
+            m = 0x78
+            while true do
+                Z, m = P:jr(o, m, k)
+                if Z == 0x0314A then
+                    break
+                elseif Z == 28119 then
+                    goto continue
+                end
+                ::continue::
+            end
+            k[54] = nil
+            k[55] = nil
+            k[0b111000] = nil
+            return m
+        end,
+        
+        pr = function(P, _, k, m, o, Z, l, d, f, W, F, U, O, T)
+            while true do
+                if d == 66 then
+                    m[P] = o
+                    break
+                elseif d ~= 47 then
+                else
+                    k = (W - f) / 8
+                    d = 0x42
+                    l = 0xB5
+                    goto continue
+                end
+                ::continue::
+            end
+            Z[P] = T
+            F[P] = k
+            O[P] = U
+            return k, d, l
+        end,
+        
+        V = function(P)
+            return P[8241]
+        end,
+        
+        F = function(P, k, m, o, Z)
+            if m == 98 then
+                k[23] = Z[P.B]
+                if not (not o[0x2d9A]) then
+                    m = o[0x2D9A]
+                else
+                    m = -1744830374 + P.Ix(P.Kx(P.d[4] - P.d[4]) - o[1460], 0x1a)
+                    o[11674] = m
+                end
+            else
+                k[24] = 4294967296
+                return 42370, m
+            end
+            return nil, m
+        end,
+        
+        Lr = function(P, k, m, o, Z, l, d, f, W)
+            if l == 4 then
+                if Z[9] then
+                    local F, U
+                    for O = 12, 41, 29 do
+                        if not (O <= 12) then
+                            F[U + 1] = o
+                        else
+                            F = Z[36][d]
+                            U = #F
+                        end
+                    end
+                    F[U + 2] = k
+                    F[U + 3] = 0x7
+                else
+                    f[k] = Z[8][d]
+                end
+            elseif l == 3 then
+                m[k] = d
+            elseif l == 5 then
+                P:hr(m, k, d)
+            elseif l == 0 then
+                m[k] = (k - d)
+            else
+                if l == 6 then
+                    P:Fr(W, d, Z, f, k)
+                end
+            end
+        end,
+        
+        -- Handler: String Table Decode
+        Tr = function(P, k, m, o, Z)
+            repeat
+                if m == 82 then
+                    k[42] = 9007199254740992
+                    k[43] = P.Kx
+                    if not (not o[25661]) then
+                        m = o[0x643D]
+                    else
+                        m = -0x7331de2f + P.ix(P.Kx(P.Gx(o[7888])) + P.d[2], P.d[3], P.d[2], o[0x4082])
+                        o[0x643D] = m
+                    end
+                else
+                    if m == 9 then
+                        Z = (function(o)
+                            o = k[0x13](o, 'z', "!!!!!")
+                            local l, d = #o - 2, 0
+                            local f = k[15]((l / 5) * 0x4)
+                            local W = {}
+                            for F = 5, l, 5 do
+                                local l = k[18](o, F, F + 4)
+                                F = W[l]
+                                if not F then
+                                    local o, U, O, T, V = k[3](l, 1, 5)
+                                    local B = (V - 33) + (T - 33) * 85 + (O - 33) * 0x1C39 + (U - 33) * 0x95EED + (o - 33) * 52200625
+                                    F = B
+                                    W[l] = F
+                                end
+                                k[30](f, d, F)
+                                d = d + 4
+                            end
+                            return f
+                        end)
+                        break
+                    end
+                end
+            until false
+            
+            -- ============================================
+            --  📦 STRING TABLE (PAYLOAD TER-ENCRYPT)
+            --  Ini tempat script asli disembunyikan
+            -- ============================================
+            k[0x2C] = Z([=[
+                -- [STRING TABLE TER-ENCRYPT - PAYLOAD ASLI]
+                -- Format: karakter acak yang di-decode jadi Lua bytecode
+                -- Panjang: ratusan baris
+                
+                -- Di sini kau upload payload asli yang sudah di-encode
+                -- Contoh: script auto steal, ESP, fly, dll
+            ]=])
+        end,
+    }
+    
+    -- ========== VM STATE ==========
+    local vmState = {
+        [0] = 0,
+        [1] = 0,
+        [2] = {},
+        [8] = {},
+        [13] = string.gsub,
+        [17] = nil,
+        [18] = nil,
+    }
+    
+    -- ========== OPCODE DISPATCH TABLE ==========
+    local dispatch = {
+        [0x01] = VM.h,
+        [0x02] = VM.Vr,
+        [0x03] = VM.Gr,
+        [0x04] = VM.O,
+        [0x05] = VM.P,
+        [0x06] = VM.Xx,
+        [0x07] = VM.Dr,
+        [0x08] = VM.vr,
+        [0x09] = VM.pr,
+        [0x0A] = VM.V,
+        [0x0B] = VM.F,
+        [0x0C] = VM.Lr,
+        [0x0D] = VM.Tr,
+    }
+    
+    -- ========== PAYLOAD ASLI (yang di-obfuscate) ==========
+    local function Payload(...)
+        -- ============================================
+        --  🥚 SOUGPT STEAL AN EGG HUB
+        --  Fitur lengkap untuk Steal an Egg
+        -- ============================================
+        
+        local Players = game:GetService("Players")
+        local RunService = game:GetService("RunService")
+        local UserInputService = game:GetService("UserInputService")
+        local VirtualUser = game:GetService("VirtualUser")
+        local LP = Players.LocalPlayer
+        local Camera = workspace.CurrentCamera
+        local Drawing = Drawing or debug.getupvalue(getrenv().Drawing, 1) or Drawing
+        
+        -- ========== KONFIGURASI ==========
+        getgenv().SE = {
+            AutoSteal = false, StealRange = 20, StealDelay = 0.3,
+            AutoPlace = false, AutoHatch = false,
+            EggESP = false, ESPColor = Color3.fromRGB(255, 200, 0),
+            BaseESP = false, PlayerESP = false,
+            Fly = false, FlySpeed = 120, Noclip = false,
+            Speed = false, SpeedValue = 100,
+            AutoTreadmill = false,
+            Desync = false, AntiAfk = true,
+            ReturnToBase = true, BasePosition = nil,
+        }
+        local C = getgenv().SE
+        
+        -- ========== ANTI-AFK ==========
+        if C.AntiAfk then
+            LP.Idled:Connect(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new())
+            end)
+        end
+        
+        -- ========== ANTI-CHEAT BYPASS ==========
+        pcall(function()
+            local oldNC
+            oldNC = hookmetamethod(game, "__namecall", function(self, ...)
+                local m = getnamecallmethod()
+                if m == "FireServer" then
+                    local s = tostring(self):lower()
+                    if s:find("kick") or s:find("anticheat") or s:find("ban") then
+                        return
+                    end
+                end
+                return oldNC(self, ...)
+            end)
+        end)
+        
+        -- ========== EGG DETECTION ==========
+        local function GetAllEggPrompts()
+            local prompts = {}
+            local function scan(obj)
+                if obj:IsA("ProximityPrompt") then
+                    local a = obj.ActionText:lower()
+                    local o = obj.ObjectText:lower()
+                    if a:find("steal") or a:find("egg") or a:find("take") or o:find("egg") then
+                        table.insert(prompts, obj)
+                    end
+                end
+                for _, c in ipairs(obj:GetChildren()) do
+                    scan(c)
+                end
+            end
+            scan(workspace)
+            return prompts
+        end
+        
+        local function GetClosestEgg()
+            local closest, shortest = nil, C.StealRange
+            local char = LP.Character
+            if not char then return nil end
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if not root then return nil end
+            for _, p in ipairs(GetAllEggPrompts()) do
+                local part = p.Parent
+                if part and part:IsA("BasePart") then
+                    local d = (part.Position - root.Position).Magnitude
+                    if d < shortest then
+                        shortest = d
+                        closest = p
+                    end
+                end
+            end
+            return closest
+        end
+        
+        local function GetPlacePrompt()
+            local char = LP.Character
+            if not char then return nil end
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if not root then return nil end
+            for _, obj in ipairs(workspace:GetDescendants()) do
+                if obj:IsA("ProximityPrompt") then
+                    local a = obj.ActionText:lower()
+                    if a:find("place") or a:find("hatch") or a:find("incubat") then
+                        local part = obj.Parent
+                        if part and part:IsA("BasePart") then
+                            local d = (part.Position - root.Position).Magnitude
+                            if d < 25 then return obj end
+                        end
+                    end
+                end
+            end
+            return nil
+        end
+        
+        -- ========== AUTO STEAL ==========
+        local lastSteal = 0
+        local stolenEggs = 0
+        
+        local function StealEgg(prompt)
+            if not prompt then return end
+            local now = tick()
+            if now - lastSteal < C.StealDelay then return end
+            lastSteal = now
+            pcall(function()
+                prompt:InputHoldBegin()
+                task.wait(prompt.HoldDuration or 0.1)
+                prompt:InputHoldEnd()
+            end)
+            stolenEggs = stolenEggs + 1
+        end
+        
+        -- ========== FLY ==========
+        local flyConn = nil
+        local function ToggleFly(state)
+            C.Fly = state
+            local char = LP.Character
+            if not char then return end
+            local root = char:FindFirstChild("HumanoidRootPart")
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if not root or not hum then return end
+            
+            if state then
+                local bv = Instance.new("BodyVelocity", root)
+                bv.Name = "SGPT_Fly"
+                bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+                bv.Velocity = Vector3.zero
+                
+                local bg = Instance.new("BodyGyro", root)
+                bg.Name = "SGPT_Gyro"
+                bg.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+                bg.P = 1000
+                bg.CFrame = root.CFrame
+                
+                hum.PlatformStand = true
+                
+                flyConn = RunService.RenderStepped:Connect(function()
+                    if not C.Fly then return end
+                    local mv = Vector3.zero
+                    if UserInputService:IsKeyDown(Enum.KeyCode.W) then mv += Camera.CFrame.LookVector end
+                    if UserInputService:IsKeyDown(Enum.KeyCode.S) then mv -= Camera.CFrame.LookVector end
+                    if UserInputService:IsKeyDown(Enum.KeyCode.A) then mv -= Camera.CFrame.RightVector end
+                    if UserInputService:IsKeyDown(Enum.KeyCode.D) then mv += Camera.CFrame.RightVector end
+                    if UserInputService:IsKeyDown(Enum.KeyCode.Space) then mv += Vector3.new(0, 1, 0) end
+                    if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then mv -= Vector3.new(0, 1, 0) end
+                    bv.Velocity = mv.Magnitude > 0 and mv.Unit * C.FlySpeed or Vector3.zero
+                    bg.CFrame = Camera.CFrame
+                end)
+            else
+                if flyConn then flyConn:Disconnect() flyConn = nil end
+                local bv = root:FindFirstChild("SGPT_Fly")
+                local bg = root:FindFirstChild("SGPT_Gyro")
+                if bv then bv:Destroy() end
+                if bg then bg:Destroy() end
+                hum.PlatformStand = false
+            end
+        end
+        
+        -- ========== NOCLIP ==========
+        local noclipConn = nil
+        local function ToggleNoclip(state)
+            C.Noclip = state
+            if noclipConn then noclipConn:Disconnect() noclipConn = nil end
+            if not state then return end
+            noclipConn = RunService.Stepped:Connect(function()
+                local char = LP.Character
+                if char then
+                    for _, p in ipairs(char:GetDescendants()) do
+                        if p:IsA("BasePart") then p.CanCollide = false end
+                    end
+                end
+            end)
+        end
+        
+        -- ========== SPEED ==========
+        local speedConn = nil
+        local function ToggleSpeed(state)
+            C.Speed = state
+            if speedConn then speedConn:Disconnect() speedConn = nil end
+            if not state then return end
+            speedConn = RunService.Heartbeat:Connect(function()
+                local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+                if hum then hum.WalkSpeed = C.SpeedValue end
+            end)
+        end
+        
+        -- ========== ESP ==========
+        local ESPObjects = {}
+        
+        RunService.RenderStepped:Connect(function()
+            if not Drawing then return end
+            
+            for _, esp in pairs(ESPObjects) do
+                esp.box.Visible = false
+                esp.text.Visible = false
+            end
+            
+            if C.EggESP then
+                for _, p in ipairs(GetAllEggPrompts()) do
+                    local part = p.Parent
+                    if part and part:IsA("BasePart") then
+                        if not ESPObjects[part] then
+                            local box = Drawing.new("Square")
+                            box.Thickness = 1.5
+                            box.Color = C.ESPColor
+                            box.Filled = false
+                            local text = Drawing.new("Text")
+                            text.Size = 13
+                            text.Color = Color3.fromRGB(255, 255, 255)
+                            text.Center = true
+                            text.Outline = true
+                            text.OutlineColor = Color3.fromRGB(0, 0, 0)
+                            ESPObjects[part] = {box = box, text = text}
+                        end
+                        local esp = ESPObjects[part]
+                        local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                        if onScreen then
+                            local d = (part.Position - Camera.CFrame.Position).Magnitude
+                            local size = math.clamp(300 / d, 8, 60)
+                            esp.box.Size = Vector2.new(size, size)
+                            esp.box.Position = Vector2.new(pos.X - size/2, pos.Y - size/2)
+                            esp.box.Visible = true
+                            esp.text.Text = "🥚 " .. string.format("%.0fm", d)
+                            esp.text.Position = Vector2.new(pos.X, pos.Y - size/2 - 16)
+                            esp.text.Visible = true
+                        end
+                    end
+                end
+            end
+        end)
+        
+        -- ========== MAIN LOOP ==========
+        RunService.Heartbeat:Connect(function()
+            if C.AutoSteal then
+                local prompt = GetClosestEgg()
+                if prompt then StealEgg(prompt) end
+            end
+            if C.AutoPlace or C.AutoHatch then
+                local p = GetPlacePrompt()
+                if p then
+                    pcall(function()
+                        p:InputHoldBegin()
+                        task.wait(0.1)
+                        p:InputHoldEnd()
+                    end)
+                end
+            end
+        end)
+        
+        -- ========== UI (Rayfield) ==========
+        local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+        
+        local Window = Rayfield:CreateWindow({
+            Name = "🥚 SouGPT x Clover Style",
+            LoadingTitle = "Memuat SouGPT...",
+            LoadingSubtitle = "Steal an Egg Edition",
+            Theme = "DarkBlue",
+            ConfigurationSaving = {
+                Enabled = true,
+                FolderName = "SouGPT_SE",
+                FileName = "Config"
+            },
+            KeySystem = false
+        })
+        
+        -- TAB MAIN
+        local MainTab = Window:CreateTab("🏠 Main", 4483362458)
+        MainTab:CreateSection("Auto Steal")
+        MainTab:CreateToggle({
+            Name = "Auto Steal Egg",
+            CurrentValue = false,
+            Flag = "AutoSteal",
+            Callback = function(v) C.AutoSteal = v end
+        })
+        MainTab:CreateSlider({
+            Name = "Steal Range",
+            Range = {5, 50},
+            Increment = 1,
+            Suffix = " stud",
+            CurrentValue = 20,
+            Flag = "StealRange",
+            Callback = function(v) C.StealRange = v end
+        })
+        MainTab:CreateSlider({
+            Name = "Steal Delay",
+            Range = {0.1, 2},
+            Increment = 0.1,
+            Suffix = " s",
+            CurrentValue = 0.3,
+            Flag = "StealDelay",
+            Callback = function(v) C.StealDelay = v end
+        })
+        MainTab:CreateSection("Auto Base")
+        MainTab:CreateToggle({
+            Name = "Auto Place",
+            CurrentValue = false,
+            Flag = "AutoPlace",
+            Callback = function(v) C.AutoPlace = v end
+        })
+        MainTab:CreateToggle({
+            Name = "Auto Hatch",
+            CurrentValue = false,
+            Flag = "AutoHatch",
+            Callback = function(v) C.AutoHatch = v end
+        })
+        
+        -- TAB MOVEMENT
+        local MoveTab = Window:CreateTab("🏃 Movement", 4483362458)
+        MoveTab:CreateSection("Fly")
+        MoveTab:CreateToggle({
+            Name = "Fly (WASD+Space/Ctrl)",
+            CurrentValue = false,
+            Flag = "Fly",
+            Callback = function(v) ToggleFly(v) end
+        })
+        MoveTab:CreateSlider({
+            Name = "Fly Speed",
+            Range = {20, 300},
+            Increment = 10,
+            Suffix = "",
+            CurrentValue = 120,
+            Flag = "FlySpeed",
+            Callback = function(v) C.FlySpeed = v end
+        })
+        MoveTab:CreateSection("Noclip")
+        MoveTab:CreateToggle({
+            Name = "Noclip",
+            CurrentValue = false,
+            Flag = "Noclip",
+            Callback = function(v) ToggleNoclip(v) end
+        })
+        MoveTab:CreateSection("Speed")
+        MoveTab:CreateToggle({
+            Name = "Speed",
+            CurrentValue = false,
+            Flag = "Speed",
+            Callback = function(v) ToggleSpeed(v) end
+        })
+        MoveTab:CreateSlider({
+            Name = "Speed Value",
+            Range = {16, 300},
+            Increment = 1,
+            Suffix = "",
+            CurrentValue = 100,
+            Flag = "SpeedValue",
+            Callback = function(v) C.SpeedValue = v end
+        })
+        
+        -- TAB ESP
+        local ESPTab = Window:CreateTab("👁️ ESP", 4483362458)
+        ESPTab:CreateSection("Egg ESP")
+        ESPTab:CreateToggle({
+            Name = "Egg ESP",
+            CurrentValue = false,
+            Flag = "EggESP",
+            Callback = function(v) C.EggESP = v end
+        })
+        ESPTab:CreateColorPicker({
+            Name = "ESP Color",
+            Color = Color3.fromRGB(255, 200, 0),
+            Flag = "ESPColor",
+            Callback = function(v) C.ESPColor = v end
+        })
+        
+        -- TAB MISC
+        local MiscTab = Window:CreateTab("⚙️ Misc", 4483362458)
+        MiscTab:CreateSection("Safety")
+        MiscTab:CreateToggle({
+            Name = "Anti AFK",
+            CurrentValue = true,
+            Flag = "AntiAfk",
+            Callback = function(v) C.AntiAfk = v end
+        })
+        MiscTab:CreateSection("Info")
+        MiscTab:CreateParagraph({
+            Title = "SouGPT x Clover Style",
+            Content = "Steal an Egg Edition\nVM-Based Obfuscated\nAnti-Cheat Bypass Active"
+        })
+        
+        Rayfield:Notify({
+            Title = "🥚 SouGPT x Clover",
+            Content = "Hub loaded! Anti-cheat bypass aktif.",
+            Duration = 5,
+            Image = 4483362458
+        })
+    end
+    
+    -- ========== EXECUTE ==========
+    -- Panggil payload
+    return Payload(...)
+end)(...)
