@@ -1,0 +1,537 @@
+-- ============================================
+--  🍎 SOUGPT FRUIT DETECTOR
+--  Deteksi Fruit Real-time + ESP + Notif
+--  "Dibuat untuk Tuanku Xso"
+-- ============================================
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+-- ============================================
+--  🎨 LOAD UI
+-- ============================================
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "SouGPT | Fruit Detector",
+    LoadingTitle = "Memuat Fruit Detector...",
+    LoadingSubtitle = "by SouGPT untuk Tuanku Xso",
+    Theme = "DarkBlue",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "SouGPT_FruitDetector",
+        FileName = "Config"
+    },
+    KeySystem = false
+})
+
+-- ============================================
+--  ⚙️ KONFIGURASI
+-- ============================================
+
+getgenv().FruitConfig = {
+    Enabled = true,
+    ShowESP = true,
+    ShowName = true,
+    ShowDistance = true,
+    ShowRarity = true,
+    NotifyOnSpawn = true,
+    AutoTrack = false,          -- Kamera fokus ke fruit terdekat
+    TrackDistance = 50,          -- Jarak auto-track
+    ESPColor = Color3.fromRGB(255, 100, 100),
+    MaxDistance = 5000,          -- Filter jarak ESP
+}
+
+local Config = getgenv().FruitConfig
+
+-- ============================================
+--  📦 SERVICE & DATA
+-- ============================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Camera = workspace.CurrentCamera
+local LP = Players.LocalPlayer
+local Drawing = Drawing or debug.getupvalue(getrenv().Drawing, 1) or Drawing
+
+local ESPObjects = {}
+local FruitList = {}       -- Track fruit yang sudah pernah dideteksi
+local LastNotified = {}     -- Track notif biar ga spam
+
+-- ============================================
+--  📋 DATABASE FRUIT & RARITY
+-- ============================================
+
+local FruitRarity = {
+    -- Common
+    ["Rocket"] = {rarity = "Common", color = Color3.fromRGB(150, 150, 150)},
+    ["Spin"] = {rarity = "Common", color = Color3.fromRGB(150, 150, 150)},
+    ["Chop"] = {rarity = "Common", color = Color3.fromRGB(150, 150, 150)},
+    ["Spring"] = {rarity = "Common", color = Color3.fromRGB(150, 150, 150)},
+    ["Bomb"] = {rarity = "Common", color = Color3.fromRGB(150, 150, 150)},
+    ["Smoke"] = {rarity = "Common", color = Color3.fromRGB(150, 150, 150)},
+    ["Spike"] = {rarity = "Common", color = Color3.fromRGB(150, 150, 150)},
+    ["Flame"] = {rarity = "Uncommon", color = Color3.fromRGB(100, 255, 100)},
+    ["Falcon"] = {rarity = "Uncommon", color = Color3.fromRGB(100, 255, 100)},
+    ["Ice"] = {rarity = "Uncommon", color = Color3.fromRGB(100, 255, 100)},
+    ["Sand"] = {rarity = "Uncommon", color = Color3.fromRGB(100, 255, 100)},
+    ["Dark"] = {rarity = "Uncommon", color = Color3.fromRGB(100, 255, 100)},
+    ["Diamond"] = {rarity = "Rare", color = Color3.fromRGB(100, 200, 255)},
+    ["Light"] = {rarity = "Rare", color = Color3.fromRGB(100, 200, 255)},
+    ["Rubber"] = {rarity = "Rare", color = Color3.fromRGB(100, 200, 255)},
+    ["Barrier"] = {rarity = "Rare", color = Color3.fromRGB(100, 200, 255)},
+    ["Ghost"] = {rarity = "Rare", color = Color3.fromRGB(100, 200, 255)},
+    ["Magma"] = {rarity = "Legendary", color = Color3.fromRGB(255, 180, 0)},
+    ["Quake"] = {rarity = "Legendary", color = Color3.fromRGB(255, 180, 0)},
+    ["Buddha"] = {rarity = "Legendary", color = Color3.fromRGB(255, 180, 0)},
+    ["Love"] = {rarity = "Legendary", color = Color3.fromRGB(255, 180, 0)},
+    ["Spider"] = {rarity = "Legendary", color = Color3.fromRGB(255, 180, 0)},
+    ["Sound"] = {rarity = "Legendary", color = Color3.fromRGB(255, 180, 0)},
+    ["Phoenix"] = {rarity = "Mythical", color = Color3.fromRGB(255, 100, 255)},
+    ["Portal"] = {rarity = "Mythical", color = Color3.fromRGB(255, 100, 255)},
+    ["Rumble"] = {rarity = "Mythical", color = Color3.fromRGB(255, 100, 255)},
+    ["Pain"] = {rarity = "Mythical", color = Color3.fromRGB(255, 100, 255)},
+    ["Blizzard"] = {rarity = "Mythical", color = Color3.fromRGB(255, 100, 255)},
+    ["Gravity"] = {rarity = "Mythical", color = Color3.fromRGB(255, 100, 255)},
+    ["Mammoth"] = {rarity = "Mythical", color = Color3.fromRGB(255, 100, 255)},
+    ["T-Rex"] = {rarity = "Mythical", color = Color3.fromRGB(255, 100, 255)},
+    ["Dough"] = {rarity = "Mythical", color = Color3.fromRGB(255, 100, 255)},
+    ["Shadow"] = {rarity = "Mythical", color = Color3.fromRGB(255, 100, 255)},
+    ["Venom"] = {rarity = "Mythical", color = Color3.fromRGB(255, 100, 255)},
+    ["Control"] = {rarity = "Mythical", color = Color3.fromRGB(255, 100, 255)},
+    ["Spirit"] = {rarity = "Mythical", color = Color3.fromRGB(255, 100, 255)},
+    ["Dragon"] = {rarity = "Legendary", color = Color3.fromRGB(255, 50, 50)},
+    ["Leopard"] = {rarity = "Mythical", color = Color3.fromRGB(255, 50, 50)},
+    ["Kitsune"] = {rarity = "Mythical", color = Color3.fromRGB(255, 50, 50)},
+    ["Yeti"] = {rarity = "Mythical", color = Color3.fromRGB(255, 100, 255)},
+    ["Gas"] = {rarity = "Mythical", color = Color3.fromRGB(255, 100, 255)},
+}
+
+-- ============================================
+--  🔍 FUNGSI DETEKSI FRUIT
+-- ============================================
+
+local function IsFruit(obj)
+    if not obj or not obj:IsA("Tool") then return false end
+    local name = obj.Name:gsub("%s+", "")  -- Hapus spasi
+    for fruitName, _ in pairs(FruitRarity) do
+        if name:lower() == fruitName:lower() then
+            return true, fruitName
+        end
+    end
+    return false, nil
+end
+
+local function GetFruitInfo(obj)
+    local isFruit, fruitName = IsFruit(obj)
+    if not isFruit then return nil end
+    
+    local data = FruitRarity[fruitName] or {rarity = "Unknown", color = Color3.fromRGB(255, 255, 255)}
+    
+    return {
+        name = fruitName,
+        rarity = data.rarity,
+        color = data.color,
+        tool = obj,
+        handle = obj:FindFirstChild("Handle"),
+    }
+end
+
+local function ScanAllFruits()
+    local fruits = {}
+    local char = LP.Character
+    
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Tool") then
+            local info = GetFruitInfo(obj)
+            if info and info.handle then
+                -- Cek apakah fruit ada di map (bukan di inventory)
+                local parent = obj.Parent
+                if parent and (parent == workspace or parent:IsA("Model") or parent:IsA("Folder")) then
+                    if char and char:FindFirstChild(obj.Name) then
+                        continue -- Skip fruit yang di tangan sendiri
+                    end
+                    table.insert(fruits, info)
+                end
+            end
+        end
+    end
+    
+    return fruits
+end
+
+-- ============================================
+--  👁️ ESP ENGINE
+-- ============================================
+
+local function CreateFruitESP(handle, info)
+    if ESPObjects[handle] or not Drawing then return end
+    
+    local box = Drawing.new("Square")
+    box.Thickness = 2
+    box.Color = info.color
+    box.Filled = false
+    box.Transparency = 0.8
+    
+    local nameText = Drawing.new("Text")
+    nameText.Size = 14
+    nameText.Color = info.color
+    nameText.Center = true
+    nameText.Outline = true
+    nameText.OutlineColor = Color3.fromRGB(0, 0, 0)
+    
+    local rarityText = Drawing.new("Text")
+    rarityText.Size = 12
+    rarityText.Color = Color3.fromRGB(255, 255, 255)
+    rarityText.Center = true
+    rarityText.Outline = true
+    rarityText.OutlineColor = Color3.fromRGB(0, 0, 0)
+    
+    local distText = Drawing.new("Text")
+    distText.Size = 12
+    distText.Color = Color3.fromRGB(200, 200, 200)
+    distText.Center = true
+    distText.Outline = true
+    distText.OutlineColor = Color3.fromRGB(0, 0, 0)
+    
+    ESPObjects[handle] = {
+        box = box,
+        nameText = nameText,
+        rarityText = rarityText,
+        distText = distText,
+        info = info,
+    }
+end
+
+local function UpdateESP()
+    if not Drawing then return end
+    
+    -- Reset visibility
+    for _, esp in pairs(ESPObjects) do
+        esp.box.Visible = false
+        esp.nameText.Visible = false
+        esp.rarityText.Visible = false
+        esp.distText.Visible = false
+    end
+    
+    if not Config.Enabled or not Config.ShowESP then return end
+    
+    local fruits = ScanAllFruits()
+    local activeHandles = {}
+    
+    for _, fruit in ipairs(fruits) do
+        local handle = fruit.handle
+        if handle and handle.Parent then
+            activeHandles[handle] = true
+            
+            if not ESPObjects[handle] then
+                CreateFruitESP(handle, fruit)
+            end
+            
+            local esp = ESPObjects[handle]
+            if esp then
+                -- Update info (buat jaga-jaga nama berubah)
+                esp.info = fruit
+                
+                local pos, onScreen = Camera:WorldToViewportPoint(handle.Position)
+                if onScreen then
+                    local dist = (handle.Position - Camera.CFrame.Position).Magnitude
+                    
+                    if dist <= Config.MaxDistance then
+                        -- Box
+                        local size = math.clamp(300 / dist, 10, 80)
+                        esp.box.Size = Vector2.new(size, size)
+                        esp.box.Position = Vector2.new(pos.X - size/2, pos.Y - size/2)
+                        esp.box.Color = fruit.color
+                        esp.box.Visible = true
+                        
+                        -- Name
+                        if Config.ShowName then
+                            esp.nameText.Text = "🍎 " .. fruit.name
+                            esp.nameText.Color = fruit.color
+                            esp.nameText.Position = Vector2.new(pos.X, pos.Y - size/2 - 34)
+                            esp.nameText.Visible = true
+                        end
+                        
+                        -- Rarity
+                        if Config.ShowRarity then
+                            esp.rarityText.Text = "[" .. fruit.rarity .. "]"
+                            esp.rarityText.Position = Vector2.new(pos.X, pos.Y - size/2 - 18)
+                            esp.rarityText.Visible = true
+                        end
+                        
+                        -- Distance
+                        if Config.ShowDistance then
+                            esp.distText.Text = string.format("%.0f studs", dist)
+                            esp.distText.Position = Vector2.new(pos.X, pos.Y + size/2 + 2)
+                            esp.distText.Visible = true
+                        end
+                    else
+                        esp.box.Visible = false
+                        esp.nameText.Visible = false
+                        esp.rarityText.Visible = false
+                        esp.distText.Visible = false
+                    end
+                else
+                    esp.box.Visible = false
+                    esp.nameText.Visible = false
+                    esp.rarityText.Visible = false
+                    esp.distText.Visible = false
+                end
+            end
+        end
+    end
+    
+    -- Hapus ESP yang sudah tidak ada fruitnya
+    for handle, esp in pairs(ESPObjects) do
+        if not activeHandles[handle] then
+            esp.box:Remove()
+            esp.nameText:Remove()
+            esp.rarityText:Remove()
+            esp.distText:Remove()
+            ESPObjects[handle] = nil
+        end
+    end
+end
+
+-- ============================================
+--  🔔 NOTIFIKASI FRUIT BARU
+-- ============================================
+
+local function CheckNewFruits()
+    if not Config.Enabled or not Config.NotifyOnSpawn then return end
+    
+    local fruits = ScanAllFruits()
+    local currentTime = tick()
+    
+    for _, fruit in ipairs(fruits) do
+        local key = fruit.name .. "_" .. tostring(fruit.handle)
+        if not FruitList[key] then
+            FruitList[key] = true
+            
+            -- Cooldown notif per fruit (biar ga spam)
+            local notifyKey = fruit.name
+            if not LastNotified[notifyKey] or (currentTime - LastNotified[notifyKey]) > 5 then
+                LastNotified[notifyKey] = currentTime
+                
+                Rayfield:Notify({
+                    Title = "🍎 Fruit Terdeteksi!",
+                    Content = fruit.name .. " [" .. fruit.rarity .. "] muncul di map!",
+                    Duration = 5,
+                    Image = 4483362458
+                })
+            end
+        end
+    end
+    
+    -- Cleanup fruit yang sudah tidak ada
+    for key, _ in pairs(FruitList) do
+        local found = false
+        for _, fruit in ipairs(fruits) do
+            if key == fruit.name .. "_" .. tostring(fruit.handle) then
+                found = true
+                break
+            end
+        end
+        if not found then
+            FruitList[key] = nil
+        end
+    end
+end
+
+-- ============================================
+--  🎯 AUTO TRACK
+-- ============================================
+
+local function AutoTrack()
+    if not Config.AutoTrack then return end
+    
+    local fruits = ScanAllFruits()
+    if #fruits == 0 then return end
+    
+    local char = LP.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    -- Cari fruit terdekat
+    local nearest, nearestDist = nil, math.huge
+    for _, fruit in ipairs(fruits) do
+        if fruit.handle then
+            local dist = (fruit.handle.Position - root.Position).Magnitude
+            if dist < nearestDist then
+                nearestDist = dist
+                nearest = fruit
+            end
+        end
+    end
+    
+    -- Fokus kamera
+    if nearest and nearest.handle and nearestDist <= Config.TrackDistance then
+        local targetPos = nearest.handle.Position
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+    end
+end
+
+-- ============================================
+--  🚀 MAIN LOOP
+-- ============================================
+
+RunService.RenderStepped:Connect(function()
+    UpdateESP()
+    AutoTrack()
+end)
+
+-- Cek fruit baru setiap 1 detik
+task.spawn(function()
+    while task.wait(1) do
+        pcall(CheckNewFruits)
+    end
+end)
+
+-- ============================================
+--  🎨 UI
+-- ============================================
+
+-- TAB DETECTOR
+local DetectorTab = Window:CreateTab("🍎 Detector", 4483362458)
+
+DetectorTab:CreateSection("Fruit Detection")
+
+DetectorTab:CreateToggle({
+    Name = "Enable Detector",
+    CurrentValue = true,
+    Flag = "Enabled",
+    Callback = function(v) Config.Enabled = v end
+})
+
+DetectorTab:CreateToggle({
+    Name = "Show ESP",
+    CurrentValue = true,
+    Flag = "ShowESP",
+    Callback = function(v) Config.ShowESP = v end
+})
+
+DetectorTab:CreateToggle({
+    Name = "Show Fruit Name",
+    CurrentValue = true,
+    Flag = "ShowName",
+    Callback = function(v) Config.ShowName = v end
+})
+
+DetectorTab:CreateToggle({
+    Name = "Show Rarity",
+    CurrentValue = true,
+    Flag = "ShowRarity",
+    Callback = function(v) Config.ShowRarity = v end
+})
+
+DetectorTab:CreateToggle({
+    Name = "Show Distance",
+    CurrentValue = true,
+    Flag = "ShowDistance",
+    Callback = function(v) Config.ShowDistance = v end
+})
+
+DetectorTab:CreateSlider({
+    Name = "Max Distance",
+    Range = {100, 10000},
+    Increment = 100,
+    Suffix = " studs",
+    CurrentValue = 5000,
+    Flag = "MaxDistance",
+    Callback = function(v) Config.MaxDistance = v end
+})
+
+-- TAB NOTIFIKASI
+local NotifTab = Window:CreateTab("🔔 Notifikasi", 4483362458)
+
+NotifTab:CreateSection("Alert")
+
+NotifTab:CreateToggle({
+    Name = "Notify on Fruit Spawn",
+    CurrentValue = true,
+    Flag = "NotifyOnSpawn",
+    Callback = function(v) Config.NotifyOnSpawn = v end
+})
+
+NotifTab:CreateSection("Info")
+NotifTab:CreateParagraph({
+    Title = "Cara Kerja",
+    Content = "Script akan otomatis mendeteksi fruit yang muncul di map.\nNotifikasi muncul dengan nama fruit + rarity.\nCooldown 5 detik per fruit biar ga spam."
+})
+
+-- TAB AUTO TRACK
+local TrackTab = Window:CreateTab("🎯 Auto Track", 4483362458)
+
+TrackTab:CreateSection("Camera Track")
+
+TrackTab:CreateToggle({
+    Name = "Auto Track Nearest Fruit",
+    CurrentValue = false,
+    Flag = "AutoTrack",
+    Callback = function(v) Config.AutoTrack = v end
+})
+
+TrackTab:CreateSlider({
+    Name = "Track Distance",
+    Range = {10, 200},
+    Increment = 5,
+    Suffix = " studs",
+    CurrentValue = 50,
+    Flag = "TrackDistance",
+    Callback = function(v) Config.TrackDistance = v end
+})
+
+-- TAB FRUIT LIST
+local ListTab = Window:CreateTab("📋 Fruit List", 4483362458)
+
+ListTab:CreateSection("Fruit Terdeteksi")
+
+ListTab:CreateButton({
+    Name = "📊 Scan Sekarang",
+    Callback = function()
+        local fruits = ScanAllFruits()
+        if #fruits == 0 then
+            Rayfield:Notify({
+                Title = "🍎 Fruit Detector",
+                Content = "Tidak ada fruit di map saat ini.",
+                Duration = 3
+            })
+            return
+        end
+        
+        local text = "Fruit ditemukan: " .. #fruits .. "\n\n"
+        for i, fruit in ipairs(fruits) do
+            text = text .. i .. ". " .. fruit.name .. " [" .. fruit.rarity .. "]\n"
+        end
+        
+        Rayfield:Notify({
+            Title = "🍎 Hasil Scan",
+            Content = text,
+            Duration = 8
+        })
+    end
+})
+
+ListTab:CreateSection("Rarity Info")
+ListTab:CreateParagraph({
+    Title = "Kategori Rarity",
+    Content = "Common = Abu-abu\nUncommon = Hijau\nRare = Biru\nLegendary = Kuning\nMythical = Ungu/Merah\n\nWarna ESP mengikuti rarity fruit."
+})
+
+-- ============================================
+--  🚀 NOTIFIKASI START
+-- ============================================
+
+Rayfield:Notify({
+    Title = "🍎 SouGPT Fruit Detector",
+    Content = "Aktif! Fruit akan otomatis terdeteksi dan muncul di ESP.",
+    Duration = 4,
+    Image = 4483362458
+})
+
+print("========================================")
+print("🍎 SouGPT Fruit Detector")
+print("✅ Loaded successfully")
+print("========================================")
