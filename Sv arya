@@ -1,0 +1,695 @@
+-- ============================================
+--  ⚔️ SOUGPT BLOX FRUITS HUB
+--  Auto Farm | ESP | Movement | Anti-Ban
+--  "Dibuat untuk Tuanku Xso"
+-- ============================================
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+-- ============================================
+--  🎨 LOAD RAYFIELD UI
+-- ============================================
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "SouGPT | Blox Fruits",
+    LoadingTitle = "Memuat SouGPT Hub...",
+    LoadingSubtitle = "by SouGPT untuk Tuanku Xso",
+    Theme = "DarkBlue",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "SouGPT_BloxFruits",
+        FileName = "Config"
+    },
+    KeySystem = false
+})
+
+-- ============================================
+--  ⚙️ KONFIGURASI
+-- ============================================
+
+getgenv().BF_Config = {
+    -- Auto Farm
+    AutoFarm = false,
+    AutoQuest = false,
+    AutoFarmNearest = false,
+    AutoBoss = false,
+    FarmMode = "Level", -- "Level", "Nearest", "Boss"
+    
+    -- Combat
+    KillAura = false,
+    KillAuraRange = 30,
+    FastAttack = false,
+    AutoHaki = false,
+    AutoSword = false,
+    
+    -- ESP
+    FruitESP = false,
+    ChestESP = false,
+    PlayerESP = false,
+    BossESP = false,
+    ESPColor = Color3.fromRGB(255, 100, 100),
+    
+    -- Movement
+    SpeedEnabled = false,
+    SpeedValue = 100,
+    InfiniteJump = false,
+    FlyEnabled = false,
+    FlySpeed = 150,
+    
+    -- Misc
+    AntiAfk = true,
+    AutoRedeem = false,
+    Desync = false,
+}
+
+local Config = getgenv().BF_Config
+
+-- ============================================
+--  📦 SERVICE
+-- ============================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local VirtualUser = game:GetService("VirtualUser")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LP = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local Drawing = Drawing or debug:getupvalue(getrenv().Drawing, 1) or Drawing
+
+local ESPObjects = {}
+local FlyConnection = nil
+local KillAuraConnection = nil
+local farmConnection = nil
+
+-- ============================================
+--  🛡️ ANTI-AFK
+-- ============================================
+
+if Config.AntiAfk then
+    LP.Idled:Connect(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
+end
+
+-- ============================================
+--  🌾 AUTO FARM CORE
+-- ============================================
+
+-- Fungsi: ambil level player
+local function GetLevel()
+    local stats = LP:FindFirstChild("Data") or LP:FindFirstChild("leaderstats")
+    if stats then
+        local lvl = stats:FindFirstChild("Level") or stats:FindFirstChild("Lvl")
+        if lvl then return lvl.Value end
+    end
+    return 0
+end
+
+-- Fungsi: teleport ke posisi
+local function TeleportTo(pos)
+    local char = LP.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if root then
+        root.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0))
+    end
+end
+
+-- Fungsi: cari mob terdekat
+local function GetNearestMob(range)
+    range = range or 100
+    local char = LP.Character
+    if not char then return nil end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    
+    local nearest, nearestDist = nil, range
+    
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") then
+            local hum = obj:FindFirstChildOfClass("Humanoid")
+            if hum.Health > 0 and obj ~= char then
+                -- Cek apakah NPC/mob musuh
+                if obj:FindFirstChild("HumanoidRootPart") then
+                    local dist = (obj.HumanoidRootPart.Position - root.Position).Magnitude
+                    if dist < nearestDist then
+                        nearestDist = dist
+                        nearest = obj
+                    end
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+-- Fungsi: cari boss
+local function GetBoss()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj.Name:lower():find("boss") then
+            local hum = obj:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 then
+                return obj
+            end
+        end
+    end
+    return nil
+end
+
+-- Fungsi: attack mob (dengan tool yang di-equip)
+local function AttackMob(mob)
+    if not mob then return end
+    local char = LP.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    local mobRoot = mob:FindFirstChild("HumanoidRootPart")
+    if not mobRoot then return end
+    
+    -- Teleport ke mob
+    root.CFrame = CFrame.new(mobRoot.Position + Vector3.new(0, 5, 0), mobRoot.Position)
+    
+    -- Trigger attack
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then
+        tool:Activate()
+    end
+end
+
+-- ============================================
+--  ⚔️ KILL AURA
+-- ============================================
+
+local function StartKillAura()
+    if KillAuraConnection then return end
+    KillAuraConnection = RunService.Heartbeat:Connect(function()
+        if not Config.KillAura then return end
+        
+        local char = LP.Character
+        if not char then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("Model") and obj ~= char then
+                local hum = obj:FindFirstChildOfClass("Humanoid")
+                local hrp = obj:FindFirstChild("HumanoidRootPart")
+                if hum and hrp and hum.Health > 0 then
+                    local dist = (hrp.Position - root.Position).Magnitude
+                    if dist <= Config.KillAuraRange then
+                        local tool = char:FindFirstChildOfClass("Tool")
+                        if tool then tool:Activate() end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- ============================================
+--  🏃 MOVEMENT
+-- ============================================
+
+local speedConn = nil
+local function UpdateSpeed()
+    if speedConn then speedConn:Disconnect() speedConn = nil end
+    if not Config.SpeedEnabled then return end
+    speedConn = RunService.Heartbeat:Connect(function()
+        local char = LP.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.WalkSpeed = Config.SpeedValue end
+        end
+    end)
+end
+
+-- Infinite Jump
+UserInputService.JumpRequest:Connect(function()
+    if Config.InfiniteJump then
+        local char = LP.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+        end
+    end
+end)
+
+-- Fly
+local function ToggleFly(state)
+    Config.FlyEnabled = state
+    local char = LP.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not root or not hum then return end
+    
+    if state then
+        local bv = Instance.new("BodyVelocity", root)
+        bv.Name = "SouGPT_Fly"
+        bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+        bv.Velocity = Vector3.zero
+        
+        local bg = Instance.new("BodyGyro", root)
+        bg.Name = "SouGPT_Gyro"
+        bg.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+        bg.P = 1000
+        bg.CFrame = root.CFrame
+        
+        hum.PlatformStand = true
+        
+        FlyConnection = RunService.RenderStepped:Connect(function()
+            if not Config.FlyEnabled then return end
+            local move = Vector3.zero
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += Camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= Camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then move -= Camera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += Camera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
+            
+            bv.Velocity = move.Magnitude > 0 and move.Unit * Config.FlySpeed or Vector3.zero
+            bg.CFrame = Camera.CFrame
+        end)
+    else
+        if FlyConnection then FlyConnection:Disconnect() FlyConnection = nil end
+        local bv = root:FindFirstChild("SouGPT_Fly")
+        local bg = root:FindFirstChild("SouGPT_Gyro")
+        if bv then bv:Destroy() end
+        if bg then bg:Destroy() end
+        hum.PlatformStand = false
+    end
+end
+
+-- ============================================
+--  👁️ ESP
+-- ============================================
+
+local function CreateESP(part, color, name)
+    if ESPObjects[part] or not Drawing then return end
+    local box = Drawing.new("Square")
+    box.Thickness = 1.5
+    box.Color = color
+    box.Filled = false
+    box.Transparency = 0.7
+    
+    local text = Drawing.new("Text")
+    text.Size = 13
+    text.Color = Color3.fromRGB(255, 255, 255)
+    text.Center = true
+    text.Outline = true
+    text.OutlineColor = Color3.fromRGB(0, 0, 0)
+    
+    ESPObjects[part] = {box = box, text = text, name = name}
+end
+
+local function UpdateESP()
+    if not Drawing then return end
+    
+    -- Reset
+    for _, esp in pairs(ESPObjects) do
+        esp.box.Visible = false
+        esp.text.Visible = false
+    end
+    
+    -- Fruit ESP
+    if Config.FruitESP then
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("Tool") and obj.Name:lower():find("fruit") or 
+               (obj:IsA("Model") and obj.Name:lower():find("fruit")) then
+                local handle = obj:FindFirstChild("Handle") or obj:FindFirstChildWhichIsA("BasePart")
+                if handle then
+                    if not ESPObjects[handle] then CreateESP(handle, Config.ESPColor, "🍎 " .. obj.Name) end
+                    local esp = ESPObjects[handle]
+                    if esp then
+                        local pos, onScreen = Camera:WorldToViewportPoint(handle.Position)
+                        if onScreen then
+                            local dist = (handle.Position - Camera.CFrame.Position).Magnitude
+                            esp.text.Text = "🍎 " .. obj.Name .. string.format(" [%.0fm]", dist)
+                            esp.text.Position = Vector2.new(pos.X, pos.Y - 20)
+                            esp.text.Visible = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Chest ESP
+    if Config.ChestESP then
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj.Name:lower():find("chest") then
+                local handle = obj:FindFirstChildWhichIsA("BasePart") or obj:FindFirstChild("Handle")
+                if handle then
+                    if not ESPObjects[handle] then CreateESP(handle, Color3.fromRGB(255, 215, 0), "📦 Chest") end
+                    local esp = ESPObjects[handle]
+                    if esp then
+                        local pos, onScreen = Camera:WorldToViewportPoint(handle.Position)
+                        if onScreen then
+                            local dist = (handle.Position - Camera.CFrame.Position).Magnitude
+                            esp.text.Text = "📦 Chest" .. string.format(" [%.0fm]", dist)
+                            esp.text.Position = Vector2.new(pos.X, pos.Y - 20)
+                            esp.text.Visible = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Player ESP
+    if Config.PlayerESP then
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LP and plr.Character then
+                local head = plr.Character:FindFirstChild("Head")
+                if head then
+                    if not ESPObjects[head] then CreateESP(head, Color3.fromRGB(0, 255, 0), plr.Name) end
+                    local esp = ESPObjects[head]
+                    if esp then
+                        local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                        if onScreen then
+                            local dist = (head.Position - Camera.CFrame.Position).Magnitude
+                            esp.text.Text = plr.Name .. string.format(" [%.0fm]", dist)
+                            esp.text.Position = Vector2.new(pos.X, pos.Y - 20)
+                            esp.text.Visible = true
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- ============================================
+--  🌾 FARM LOOP
+-- ============================================
+
+farmConnection = RunService.Heartbeat:Connect(function()
+    if Config.AutoFarm then
+        local mob = GetNearestMob(150)
+        if mob then
+            AttackMob(mob)
+        end
+    end
+    
+    if Config.AutoBoss then
+        local boss = GetBoss()
+        if boss then
+            AttackMob(boss)
+        end
+    end
+    
+    if Config.AutoHaki then
+        local char = LP.Character
+        if char then
+            local haki = char:FindFirstChild("Haki") or LP.Backpack:FindFirstChild("Haki")
+            if haki and not char:FindFirstChild("Haki") then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum then hum:EquipTool(haki) end
+            end
+        end
+    end
+end)
+
+-- ESP loop
+RunService.RenderStepped:Connect(function()
+    UpdateESP()
+end)
+
+-- ============================================
+--  🎨 UI TABS
+-- ============================================
+
+-- TAB FARM
+local FarmTab = Window:CreateTab("🌾 Farm", 4483362458)
+
+FarmTab:CreateSection("Auto Farm")
+
+FarmTab:CreateToggle({
+    Name = "Auto Farm Nearest",
+    CurrentValue = false,
+    Flag = "AutoFarm",
+    Callback = function(v) Config.AutoFarm = v end
+})
+
+FarmTab:CreateToggle({
+    Name = "Auto Farm Boss",
+    CurrentValue = false,
+    Flag = "AutoBoss",
+    Callback = function(v) Config.AutoBoss = v end
+})
+
+FarmTab:CreateToggle({
+    Name = "Auto Haki",
+    CurrentValue = false,
+    Flag = "AutoHaki",
+    Callback = function(v) Config.AutoHaki = v end
+})
+
+FarmTab:CreateSlider({
+    Name = "Farm Range",
+    Range = {30, 500},
+    Increment = 10,
+    Suffix = " stud",
+    CurrentValue = 150,
+    Flag = "FarmRange",
+    Callback = function(v) end
+})
+
+FarmTab:CreateSection("Info")
+FarmTab:CreateParagraph({
+    Title = "Cara Pakai",
+    Content = "Equip sword/tool dulu sebelum aktifkan Auto Farm.\nAuto Farm akan teleport ke mob terdekat dan menyerang otomatis."
+})
+
+-- TAB COMBAT
+local CombatTab = Window:CreateTab("⚔️ Combat", 4483362458)
+
+CombatTab:CreateSection("Kill Aura")
+
+CombatTab:CreateToggle({
+    Name = "Kill Aura",
+    CurrentValue = false,
+    Flag = "KillAura",
+    Callback = function(v) 
+        Config.KillAura = v
+        if v then StartKillAura() end
+    end
+})
+
+CombatTab:CreateSlider({
+    Name = "Kill Aura Range",
+    Range = {10, 100},
+    Increment = 5,
+    Suffix = " stud",
+    CurrentValue = 30,
+    Flag = "KillAuraRange",
+    Callback = function(v) Config.KillAuraRange = v end
+})
+
+CombatTab:CreateSection("Fast Attack")
+
+CombatTab:CreateToggle({
+    Name = "Fast Attack",
+    CurrentValue = false,
+    Flag = "FastAttack",
+    Callback = function(v) Config.FastAttack = v end
+})
+
+-- TAB MOVEMENT
+local MoveTab = Window:CreateTab("🏃 Movement", 4483362458)
+
+MoveTab:CreateSection("Speed")
+
+MoveTab:CreateToggle({
+    Name = "Speed Enabled",
+    CurrentValue = false,
+    Flag = "SpeedEnabled",
+    Callback = function(v) Config.SpeedEnabled = v UpdateSpeed() end
+})
+
+MoveTab:CreateSlider({
+    Name = "Speed Value",
+    Range = {16, 500},
+    Increment = 1,
+    Suffix = "",
+    CurrentValue = 100,
+    Flag = "SpeedValue",
+    Callback = function(v) Config.SpeedValue = v end
+})
+
+MoveTab:CreateSection("Jump")
+
+MoveTab:CreateToggle({
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Flag = "InfiniteJump",
+    Callback = function(v) Config.InfiniteJump = v end
+})
+
+MoveTab:CreateSection("Fly")
+
+MoveTab:CreateToggle({
+    Name = "Fly (WASD + Space/Ctrl)",
+    CurrentValue = false,
+    Flag = "FlyEnabled",
+    Callback = function(v) ToggleFly(v) end
+})
+
+MoveTab:CreateSlider({
+    Name = "Fly Speed",
+    Range = {30, 500},
+    Increment = 10,
+    Suffix = "",
+    CurrentValue = 150,
+    Flag = "FlySpeed",
+    Callback = function(v) Config.FlySpeed = v end
+})
+
+-- TAB ESP
+local ESPTab = Window:CreateTab("👁️ ESP", 4483362458)
+
+ESPTab:CreateSection("ESP Toggle")
+
+ESPTab:CreateToggle({
+    Name = "Fruit ESP",
+    CurrentValue = false,
+    Flag = "FruitESP",
+    Callback = function(v) Config.FruitESP = v end
+})
+
+ESPTab:CreateToggle({
+    Name = "Chest ESP",
+    CurrentValue = false,
+    Flag = "ChestESP",
+    Callback = function(v) Config.ChestESP = v end
+})
+
+ESPTab:CreateToggle({
+    Name = "Player ESP",
+    CurrentValue = false,
+    Flag = "PlayerESP",
+    Callback = function(v) Config.PlayerESP = v end
+})
+
+ESPTab:CreateColorPicker({
+    Name = "ESP Color",
+    Color = Color3.fromRGB(255, 100, 100),
+    Flag = "ESPColor",
+    Callback = function(v) Config.ESPColor = v end
+})
+
+-- TAB TELEPORT
+local TPTab = Window:CreateTab("🌀 Teleport", 4483362458)
+
+TPTab:CreateSection("World 1")
+
+local W1Locations = {
+    {name = "Bandit", pos = Vector3.new(1096, 10, 1616)},
+    {name = "Monkey", pos = Vector3.new(-1632, 10, 60)},
+    {name = "Boss Gorilla", pos = Vector3.new(-1127, 48, -509)},
+    {name = "Desert", pos = Vector3.new(1026, 10, 1573)},
+    {name = "Marine Fort", pos = Vector3.new(-2762, 10, 2367)},
+}
+
+for _, loc in ipairs(W1Locations) do
+    TPTab:CreateButton({
+        Name = "📍 " .. loc.name,
+        Callback = function() TeleportTo(loc.pos) end
+    })
+end
+
+TPTab:CreateSection("World 2")
+
+local W2Locations = {
+    {name = "Kingdom of Rose", pos = Vector3.new(-2999, 10, 2000)},
+    {name = "Green Zone", pos = Vector3.new(-2779, 10, -2319)},
+    {name = "Graveyard", pos = Vector3.new(4919, 10, 3115)},
+    {name = "Snow Mountain", pos = Vector3.new(1383, 100, 1438)},
+    {name = "Cursed Ship", pos = Vector3.new(2939, 10, 6792)},
+}
+
+for _, loc in ipairs(W2Locations) do
+    TPTab:CreateButton({
+        Name = "📍 " .. loc.name,
+        Callback = function() TeleportTo(loc.pos) end
+    })
+end
+
+TPTab:CreateSection("World 3")
+
+local W3Locations = {
+    {name = "Port Town", pos = Vector3.new(-539, 80, 8266)},
+    {name = "Hydra Island", pos = Vector3.new(1998, 10, 8865)},
+    {name = "Great Tree", pos = Vector3.new(2164, 60, 7170)},
+    {name = "Floating Turtle", pos = Vector3.new(-912, 80, 9865)},
+    {name = "Haunted Castle", pos = Vector3.new(-978, 80, 5512)},
+}
+
+for _, loc in ipairs(W3Locations) do
+    TPTab:CreateButton({
+        Name = "📍 " .. loc.name,
+        Callback = function() TeleportTo(loc.pos) end
+    })
+end
+
+-- TAB MISC
+local MiscTab = Window:CreateTab("⚙️ Misc", 4483362458)
+
+MiscTab:CreateSection("Safety")
+
+MiscTab:CreateToggle({
+    Name = "Anti AFK",
+    CurrentValue = true,
+    Flag = "AntiAfk",
+    Callback = function(v) Config.AntiAfk = v end
+})
+
+MiscTab:CreateSection("Info")
+MiscTab:CreateParagraph({
+    Title = "SouGPT Blox Fruits Hub",
+    Content = "Version: 1.0.0\nDeveloper: SouGPT\nFor: Tuanku Xso\n\nFitur:\n• Auto Farm (Nearest/Boss)\n• Kill Aura\n• Fast Attack\n• Fly + Speed + Inf Jump\n• ESP (Fruit/Chest/Player)\n• Teleport (World 1/2/3)\n• Anti-AFK"
+})
+
+MiscTab:CreateButton({
+    Name = "🔄 Rejoin Server",
+    Callback = function()
+        game:GetService("TeleportService"):Teleport(game.PlaceId, LP)
+    end
+})
+
+MiscTab:CreateButton({
+    Name = "🛑 Unload Script",
+    Callback = function()
+        for _, esp in pairs(ESPObjects) do
+            esp.box:Remove()
+            esp.text:Remove()
+        end
+        if FlyConnection then FlyConnection:Disconnect() end
+        if KillAuraConnection then KillAuraConnection:Disconnect() end
+        if speedConn then speedConn:Disconnect() end
+        if farmConnection then farmConnection:Disconnect() end
+        Rayfield:Destroy()
+    end
+})
+
+-- ============================================
+--  🚀 NOTIFIKASI START
+-- ============================================
+
+Rayfield:Notify({
+    Title = "⚔️ SouGPT Blox Fruits Hub",
+    Content = "Script loaded! Equip tool dulu sebelum auto farm.",
+    Duration = 5,
+    Image = 4483362458
+})
+
+print("========================================")
+print("⚔️ SouGPT Blox Fruits Hub")
+print("✅ Loaded successfully")
+print("========================================")
