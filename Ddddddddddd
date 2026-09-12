@@ -1,0 +1,346 @@
+-- ============================================
+--  ⚔️ SOUGPT BLOX FRUITS HUB
+--  Auto Farm | Kill Aura | Fast Attack | Quest
+--  "Dibuat untuk Tuanku Xso"
+-- ============================================
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+-- ============================================
+--  🎨 LOAD RAYFIELD UI
+-- ============================================
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "SouGPT | Blox Fruits",
+    LoadingTitle = "Memuat SouGPT Hub...",
+    LoadingSubtitle = "Auto Farm & Kill Aura",
+    Theme = "DarkBlue",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "SouGPT_BloxFruits",
+        FileName = "Config"
+    },
+    KeySystem = false
+})
+
+-- ============================================
+--  ⚙️ KONFIGURASI
+-- ============================================
+
+getgenv().BF = {
+    -- Auto Farm
+    AutoFarm = false,
+    AutoQuest = false,
+    FarmRange = 150,
+    AttackDelay = 0.1,
+    
+    -- Kill Aura
+    KillAura = false,
+    KillAuraRange = 30,
+    
+    -- Combat
+    FastAttack = false,
+    AutoHaki = false,
+    
+    -- Movement
+    SpeedEnabled = false,
+    SpeedValue = 100,
+    
+    -- Misc
+    AntiAfk = true,
+}
+
+local Config = getgenv().BF
+
+-- ============================================
+--  📦 SERVICE
+-- ============================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+local LP = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- ============================================
+--  🛡️ ANTI-AFK
+-- ============================================
+
+if Config.AntiAfk then
+    LP.Idled:Connect(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
+end
+
+-- ============================================
+--  🌾 AUTO FARM CORE
+-- ============================================
+
+-- Ambil level player
+local function GetLevel()
+    local stats = LP:FindFirstChild("Data") or LP:FindFirstChild("leaderstats")
+    if stats then
+        local lvl = stats:FindFirstChild("Level") or stats:FindFirstChild("Lvl")
+        if lvl then return lvl.Value end
+    end
+    return 0
+end
+
+-- Teleport ke posisi
+local function TeleportTo(pos)
+    local char = LP.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if root then
+        root.CFrame = CFrame.new(pos + Vector3.new(0, 5, 0))
+    end
+end
+
+-- Cari mob terdekat
+local function GetNearestMob(range)
+    range = range or Config.FarmRange
+    local char = LP.Character
+    if not char then return nil end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end
+    
+    local nearest, nearestDist = nil, range
+    
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj ~= char then
+            local hum = obj:FindFirstChildOfClass("Humanoid")
+            local hrp = obj:FindFirstChild("HumanoidRootPart")
+            if hum and hrp and hum.Health > 0 then
+                local dist = (hrp.Position - root.Position).Magnitude
+                if dist < nearestDist then
+                    nearestDist = dist
+                    nearest = obj
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+-- Serang mob
+local function AttackMob(mob)
+    if not mob then return end
+    local char = LP.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    local mobRoot = mob:FindFirstChild("HumanoidRootPart")
+    if not root or not mobRoot then return end
+    
+    -- Teleport ke mob
+    root.CFrame = CFrame.new(mobRoot.Position + Vector3.new(0, 5, 0), mobRoot.Position)
+    
+    -- Trigger attack
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then
+        tool:Activate()
+    end
+end
+
+-- ============================================
+--  ⚔️ KILL AURA
+-- ============================================
+
+local killAuraConnection = nil
+
+local function StartKillAura()
+    if killAuraConnection then return end
+    killAuraConnection = RunService.Heartbeat:Connect(function()
+        if not Config.KillAura then return end
+        
+        local char = LP.Character
+        if not char then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("Model") and obj ~= char then
+                local hum = obj:FindFirstChildOfClass("Humanoid")
+                local hrp = obj:FindFirstChild("HumanoidRootPart")
+                if hum and hrp and hum.Health > 0 then
+                    local dist = (hrp.Position - root.Position).Magnitude
+                    if dist <= Config.KillAuraRange then
+                        local tool = char:FindFirstChildOfClass("Tool")
+                        if tool then tool:Activate() end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- ============================================
+--  🏃 SPEED
+-- ============================================
+
+local speedConn = nil
+local function UpdateSpeed()
+    if speedConn then speedConn:Disconnect() speedConn = nil end
+    if not Config.SpeedEnabled then return end
+    speedConn = RunService.Heartbeat:Connect(function()
+        local char = LP.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.WalkSpeed = Config.SpeedValue end
+        end
+    end)
+end
+
+-- ============================================
+--  🌾 FARM LOOP
+-- ============================================
+
+RunService.Heartbeat:Connect(function()
+    if Config.AutoFarm then
+        local mob = GetNearestMob(Config.FarmRange)
+        if mob then
+            AttackMob(mob)
+        end
+    end
+end)
+
+-- ============================================
+--  🎨 UI TABS
+-- ============================================
+
+-- TAB FARM
+local FarmTab = Window:CreateTab("🌾 Farm", 4483362458)
+
+FarmTab:CreateSection("Auto Farm")
+
+FarmTab:CreateToggle({
+    Name = "Auto Farm Nearest",
+    CurrentValue = false,
+    Flag = "AutoFarm",
+    Callback = function(v) Config.AutoFarm = v end
+})
+
+FarmTab:CreateSlider({
+    Name = "Farm Range",
+    Range = {30, 500},
+    Increment = 10,
+    Suffix = " stud",
+    CurrentValue = 150,
+    Flag = "FarmRange",
+    Callback = function(v) Config.FarmRange = v end
+})
+
+FarmTab:CreateSection("Info")
+FarmTab:CreateParagraph({
+    Title = "Cara Pakai",
+    Content = "Equip sword/tool dulu sebelum aktifkan Auto Farm.\nAuto Farm akan teleport ke mob terdekat dan menyerang otomatis."
+})
+
+-- TAB COMBAT
+local CombatTab = Window:CreateTab("⚔️ Combat", 4483362458)
+
+CombatTab:CreateSection("Kill Aura")
+
+CombatTab:CreateToggle({
+    Name = "Kill Aura",
+    CurrentValue = false,
+    Flag = "KillAura",
+    Callback = function(v) 
+        Config.KillAura = v
+        if v then StartKillAura() end
+    end
+})
+
+CombatTab:CreateSlider({
+    Name = "Kill Aura Range",
+    Range = {10, 100},
+    Increment = 5,
+    Suffix = " stud",
+    CurrentValue = 30,
+    Flag = "KillAuraRange",
+    Callback = function(v) Config.KillAuraRange = v end
+})
+
+CombatTab:CreateSection("Fast Attack")
+
+CombatTab:CreateToggle({
+    Name = "Fast Attack",
+    CurrentValue = false,
+    Flag = "FastAttack",
+    Callback = function(v) Config.FastAttack = v end
+})
+
+-- TAB MOVEMENT
+local MoveTab = Window:CreateTab("🏃 Movement", 4483362458)
+
+MoveTab:CreateSection("Speed")
+
+MoveTab:CreateToggle({
+    Name = "Speed Enabled",
+    CurrentValue = false,
+    Flag = "SpeedEnabled",
+    Callback = function(v) Config.SpeedEnabled = v UpdateSpeed() end
+})
+
+MoveTab:CreateSlider({
+    Name = "Speed Value",
+    Range = {16, 500},
+    Increment = 1,
+    Suffix = "",
+    CurrentValue = 100,
+    Flag = "SpeedValue",
+    Callback = function(v) Config.SpeedValue = v end
+})
+
+-- TAB MISC
+local MiscTab = Window:CreateTab("⚙️ Misc", 4483362458)
+
+MiscTab:CreateSection("Safety")
+
+MiscTab:CreateToggle({
+    Name = "Anti AFK",
+    CurrentValue = true,
+    Flag = "AntiAfk",
+    Callback = function(v) Config.AntiAfk = v end
+})
+
+MiscTab:CreateSection("Info")
+MiscTab:CreateParagraph({
+    Title = "SouGPT Blox Fruits Hub",
+    Content = "Version: 1.0.0\nDeveloper: SouGPT\nFor: Tuanku Xso\n\nFitur:\n• Auto Farm (Nearest)\n• Kill Aura\n• Fast Attack\n• Speed\n• Anti-AFK"
+})
+
+MiscTab:CreateButton({
+    Name = "🔄 Rejoin Server",
+    Callback = function()
+        game:GetService("TeleportService"):Teleport(game.PlaceId, LP)
+    end
+})
+
+MiscTab:CreateButton({
+    Name = "🛑 Unload Script",
+    Callback = function()
+        if speedConn then speedConn:Disconnect() end
+        if killAuraConnection then killAuraConnection:Disconnect() end
+        Rayfield:Destroy()
+    end
+})
+
+-- ============================================
+--  🚀 NOTIFIKASI START
+-- ============================================
+
+Rayfield:Notify({
+    Title = "⚔️ SouGPT Blox Fruits Hub",
+    Content = "Script loaded! Equip tool dulu sebelum auto farm.",
+    Duration = 5,
+    Image = 4483362458
+})
+
+print("========================================")
+print("⚔️ SouGPT Blox Fruits Hub")
+print("✅ Loaded successfully")
+print("========================================")
