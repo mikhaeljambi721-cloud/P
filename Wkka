@@ -1,0 +1,179 @@
+-- ============================================
+--  ✈️ SOUGPT FLY
+--  Standalone Fly Script | Delta Optimized
+--  "Dibuat untuk Tuanku Xso"
+-- ============================================
+
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+-- ============================================
+--  ⚙️ KONFIGURASI
+-- ============================================
+
+getgenv().FlyConfig = {
+    Enabled = true,        -- Auto aktif saat execute
+    Speed = 120,           -- Kecepatan fly
+    ToggleKey = Enum.KeyCode.F,   -- Tombol on/off fly
+    VerticalUp = Enum.KeyCode.Space,      -- Naik
+    VerticalDown = Enum.KeyCode.LeftControl, -- Turun
+}
+
+local Config = getgenv().FlyConfig
+
+-- ============================================
+--  📦 SERVICE
+-- ============================================
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local flyConnection = nil
+local bodyVelocity = nil
+local bodyGyro = nil
+local isFlying = false
+
+-- ============================================
+--  ✈️ FLY CORE
+-- ============================================
+
+local function StartFly()
+    local char = LP.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not root or not hum then return end
+    
+    isFlying = true
+    
+    -- BodyVelocity untuk gerakan
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.Name = "SouGPT_FlyVelocity"
+    bodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    bodyVelocity.Velocity = Vector3.zero
+    bodyVelocity.Parent = root
+    
+    -- BodyGyro untuk orientasi
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.Name = "SouGPT_FlyGyro"
+    bodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+    bodyGyro.P = 1000
+    bodyGyro.D = 50
+    bodyGyro.CFrame = root.CFrame
+    bodyGyro.Parent = root
+    
+    hum.PlatformStand = true
+    
+    flyConnection = RunService.RenderStepped:Connect(function()
+        if not isFlying then return end
+        
+        local move = Vector3.zero
+        
+        -- Horizontal movement
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            move += Camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            move -= Camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            move -= Camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            move += Camera.CFrame.RightVector
+        end
+        
+        -- Vertical movement
+        if UserInputService:IsKeyDown(Config.VerticalUp) then
+            move += Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Config.VerticalDown) then
+            move -= Vector3.new(0, 1, 0)
+        end
+        
+        -- Apply velocity
+        if move.Magnitude > 0 then
+            bodyVelocity.Velocity = move.Unit * Config.Speed
+        else
+            bodyVelocity.Velocity = Vector3.zero
+        end
+        
+        -- Follow camera
+        bodyGyro.CFrame = Camera.CFrame
+    end)
+    
+    print("[✈️ SouGPT Fly] AKTIF")
+end
+
+local function StopFly()
+    isFlying = false
+    
+    if flyConnection then
+        flyConnection:Disconnect()
+        flyConnection = nil
+    end
+    
+    if bodyVelocity then
+        bodyVelocity:Destroy()
+        bodyVelocity = nil
+    end
+    
+    if bodyGyro then
+        bodyGyro:Destroy()
+        bodyGyro = nil
+    end
+    
+    local char = LP.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then hum.PlatformStand = false end
+    end
+    
+    print("[✈️ SouGPT Fly] NONAKTIF")
+end
+
+-- ============================================
+--  🎮 TOGGLE HANDLER
+-- ============================================
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Config.ToggleKey then
+        if isFlying then
+            StopFly()
+        else
+            StartFly()
+        end
+    end
+end)
+
+-- Auto-restart fly saat respawn
+LP.CharacterAdded:Connect(function()
+    task.wait(1)
+    if Config.Enabled then
+        StartFly()
+    end
+end)
+
+-- ============================================
+--  🚀 AUTO START
+-- ============================================
+
+if Config.Enabled then
+    task.wait(1)
+    StartFly()
+end
+
+-- ============================================
+--  📋 INFO
+-- ============================================
+
+print("========================================")
+print("✈️ SOUGPT FLY - Loaded")
+print("🎮 Toggle: Tekan [" .. Config.ToggleKey.Name .. "]")
+print("⬆️ Naik: [" .. Config.VerticalUp.Name .. "]")
+print("⬇️ Turun: [" .. Config.VerticalDown.Name .. "]")
+print("🏃 Gerak: W/A/S/D")
+print("========================================")
