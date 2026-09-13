@@ -1,0 +1,717 @@
+--[[
+    lil jef — Control Menu
+    GUI control panel buat monitor & test anti-cheat.
+    by SouGPT untuk xso
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local EGGS = Workspace:WaitForChild("SpawnedEggs")
+local BASES = Workspace:WaitForChild("Bases")
+
+-- =========================================================
+-- STATE
+-- =========================================================
+local menuOpen = false
+local testLog = {}
+local autoRun = false
+local dragConnection
+
+-- =========================================================
+-- COLOR PALETTE
+-- =========================================================
+local C = {
+    bg        = Color3.fromRGB(18, 18, 24),
+    panel     = Color3.fromRGB(26, 26, 34),
+    card      = Color3.fromRGB(34, 34, 44),
+    accent    = Color3.fromRGB(120, 200, 255),
+    accentDim = Color3.fromRGB(70, 120, 160),
+    success   = Color3.fromRGB(80, 220, 120),
+    fail      = Color3.fromRGB(255, 90, 90),
+    warn      = Color3.fromRGB(255, 200, 80),
+    text      = Color3.fromRGB(230, 230, 240),
+    textDim   = Color3.fromRGB(140, 140, 160),
+    border    = Color3.fromRGB(50, 50, 65),
+}
+
+-- =========================================================
+-- HELPERS
+-- =========================================================
+local function corner(parent, radius)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, radius or 8)
+    c.Parent = parent
+    return c
+end
+
+local function stroke(parent, color, thickness)
+    local s = Instance.new("UIStroke")
+    s.Color = color or C.border
+    s.Thickness = thickness or 1
+    s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    s.Parent = parent
+    return s
+end
+
+local function padding(parent, all)
+    local p = Instance.new("UIPadding")
+    p.PaddingTop = UDim.new(0, all)
+    p.PaddingBottom = UDim.new(0, all)
+    p.PaddingLeft = UDim.new(0, all)
+    p.PaddingRight = UDim.new(0, all)
+    p.Parent = parent
+    return p
+end
+
+-- =========================================================
+-- GUI ROOT
+-- =========================================================
+local gui = Instance.new("ScreenGui")
+gui.Name = "lil_jef_Menu"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = player:WaitForChild("PlayerGui")
+
+-- =========================================================
+-- TOGGLE BUTTON (kecil, kanan bawah)
+-- =========================================================
+local toggle = Instance.new("TextButton")
+toggle.Name = "Toggle"
+toggle.Size = UDim2.new(0, 70, 0, 70)
+toggle.Position = UDim2.new(1, -90, 1, -90)
+toggle.BackgroundColor3 = C.panel
+toggle.Text = "LJ"
+toggle.TextColor3 = C.accent
+toggle.Font = Enum.Font.GothamBold
+toggle.TextSize = 22
+toggle.AutoButtonColor = false
+toggle.Parent = gui
+corner(toggle, 35)
+stroke(toggle, C.accent, 2)
+
+local toggleGrad = Instance.new("UIGradient")
+toggleGrad.Color = ColorSequence.new(C.accentDim, C.accent)
+toggleGrad.Rotation = 45
+toggleGrad.Parent = toggle
+
+-- =========================================================
+-- MAIN WINDOW
+-- =========================================================
+local win = Instance.new("Frame")
+win.Name = "Window"
+win.Size = UDim2.new(0, 420, 0, 520)
+win.Position = UDim2.new(0.5, -210, 0.5, -260)
+win.BackgroundColor3 = C.bg
+win.BorderSizePixel = 0
+win.Visible = false
+win.Parent = gui
+corner(win, 14)
+stroke(win, C.accent, 1.5)
+
+-- Shadow
+local shadow = Instance.new("ImageLabel")
+shadow.Name = "Shadow"
+shadow.BackgroundTransparency = 1
+shadow.Size = UDim2.new(1, 30, 1, 30)
+shadow.Position = UDim2.new(0, -15, 0, -15)
+shadow.Image = "rbxassetid://5028857084"
+shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+shadow.ImageTransparency = 0.5
+shadow.ScaleType = Enum.ScaleType.Slice
+shadow.SliceCenter = Rect.new(24, 24, 276, 276)
+shadow.ZIndex = -1
+shadow.Parent = win
+
+-- =========================================================
+-- TITLE BAR (draggable)
+-- =========================================================
+local titleBar = Instance.new("Frame")
+titleBar.Name = "TitleBar"
+titleBar.Size = UDim2.new(1, 0, 0, 52)
+titleBar.BackgroundColor3 = C.panel
+titleBar.BorderSizePixel = 0
+titleBar.Parent = win
+corner(titleBar, 14)
+
+local titleFix = Instance.new("Frame")
+titleFix.Size = UDim2.new(1, 0, 0, 14)
+titleFix.Position = UDim2.new(0, 0, 1, -14)
+titleFix.BackgroundColor3 = C.panel
+titleFix.BorderSizePixel = 0
+titleFix.Parent = titleBar
+
+local titleDot = Instance.new("Frame")
+titleDot.Size = UDim2.new(0, 10, 0, 10)
+titleDot.Position = UDim2.new(0, 18, 0.5, -5)
+titleDot.BackgroundColor3 = C.accent
+titleDot.Parent = titleBar
+corner(titleDot, 5)
+
+local titleText = Instance.new("TextLabel")
+titleText.Size = UDim2.new(1, -70, 1, 0)
+titleText.Position = UDim2.new(0, 40, 0, 0)
+titleText.BackgroundTransparency = 1
+titleText.Text = "lil jef  ·  control panel"
+titleText.TextColor3 = C.text
+titleText.Font = Enum.Font.GothamBold
+titleText.TextSize = 16
+titleText.TextXAlignment = Enum.TextXAlignment.Left
+titleText.Parent = titleBar
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -42, 0.5, -15)
+closeBtn.BackgroundColor3 = C.card
+closeBtn.Text = "×"
+closeBtn.TextColor3 = C.text
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 20
+closeBtn.AutoButtonColor = false
+closeBtn.Parent = titleBar
+corner(closeBtn, 8)
+
+closeBtn.MouseEnter:Connect(function()
+    TweenService:Create(closeBtn, TweenInfo.new(0.15), {BackgroundColor3 = C.fail}):Play()
+end)
+closeBtn.MouseLeave:Connect(function()
+    TweenService:Create(closeBtn, TweenInfo.new(0.15), {BackgroundColor3 = C.card}):Play()
+end)
+closeBtn.MouseButton1Click:Connect(function()
+    win.Visible = false
+    menuOpen = false
+end)
+
+-- Dragging
+local function makeDraggable(frame, handle)
+    local dragging = false
+    local dragStart, startPos
+
+    handle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+        end
+    end)
+
+    handle.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    dragConnection = UserInputService.InputChanged:Connect(function(input)
+        if not dragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
+
+makeDraggable(win, titleBar)
+
+-- =========================================================
+-- STATUS BAR (di bawah title)
+-- =========================================================
+local statusBar = Instance.new("Frame")
+statusBar.Name = "StatusBar"
+statusBar.Size = UDim2.new(1, -28, 0, 42)
+statusBar.Position = UDim2.new(0, 14, 0, 62)
+statusBar.BackgroundColor3 = C.card
+statusBar.BorderSizePixel = 0
+statusBar.Parent = win
+corner(statusBar, 10)
+
+local statusDot = Instance.new("Frame")
+statusDot.Size = UDim2.new(0, 10, 0, 10)
+statusDot.Position = UDim2.new(0, 14, 0.5, -5)
+statusDot.BackgroundColor3 = C.success
+statusDot.Parent = statusBar
+corner(statusDot, 5)
+
+local statusText = Instance.new("TextLabel")
+statusText.Size = UDim2.new(1, -40, 1, 0)
+statusText.Position = UDim2.new(0, 32, 0, 0)
+statusText.BackgroundTransparency = 1
+statusText.Text = "lil jef aktif · memantau"
+statusText.TextColor3 = C.text
+statusText.Font = Enum.Font.Gotham
+statusText.TextSize = 13
+statusText.TextXAlignment = Enum.TextXAlignment.Left
+statusText.Parent = statusBar
+
+-- Pulsing animation
+task.spawn(function()
+    while gui.Parent do
+        TweenService:Create(statusDot, TweenInfo.new(0.8, Enum.EasingStyle.Sine), {
+            BackgroundTransparency = 0.5
+        }):Play()
+        task.wait(0.8)
+        TweenService:Create(statusDot, TweenInfo.new(0.8, Enum.EasingStyle.Sine), {
+            BackgroundTransparency = 0
+        }):Play()
+        task.wait(0.8)
+    end
+end)
+
+-- =========================================================
+-- TAB BAR
+-- =========================================================
+local tabBar = Instance.new("Frame")
+tabBar.Name = "TabBar"
+tabBar.Size = UDim2.new(1, -28, 0, 38)
+tabBar.Position = UDim2.new(0, 14, 0, 114)
+tabBar.BackgroundTransparency = 1
+tabBar.Parent = win
+
+local tabLayout = Instance.new("UIListLayout")
+tabLayout.FillDirection = Enum.FillDirection.Horizontal
+tabLayout.Padding = UDim.new(0, 8)
+tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+tabLayout.Parent = tabBar
+
+local content = Instance.new("Frame")
+content.Name = "Content"
+content.Size = UDim2.new(1, -28, 1, -230)
+content.Position = UDim2.new(0, 14, 0, 160)
+content.BackgroundTransparency = 1
+content.Parent = win
+
+-- =========================================================
+-- TAB SYSTEM
+-- =========================================================
+local tabs = {}
+local activeTab = nil
+
+local function createTab(name, order)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 120, 0, 34)
+    btn.BackgroundColor3 = C.card
+    btn.Text = name
+    btn.TextColor3 = C.textDim
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.AutoButtonColor = false
+    btn.LayoutOrder = order
+    btn.Parent = tabBar
+    corner(btn, 8)
+
+    local page = Instance.new("ScrollingFrame")
+    page.Size = UDim2.new(1, 0, 1, 0)
+    page.BackgroundTransparency = 1
+    page.BorderSizePixel = 0
+    page.ScrollBarThickness = 4
+    page.ScrollBarImageColor3 = C.accentDim
+    page.CanvasSize = UDim2.new(0, 0, 0, 0)
+    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    page.Visible = false
+    page.Parent = content
+
+    local pagePad = padding(page, 4)
+    local pageLayout = Instance.new("UIListLayout")
+    pageLayout.Padding = UDim.new(0, 8)
+    pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    pageLayout.Parent = page
+
+    tabs[name] = { btn = btn, page = page }
+
+    btn.MouseButton1Click:Connect(function()
+        for n, t in pairs(tabs) do
+            t.btn.BackgroundColor3 = C.card
+            t.btn.TextColor3 = C.textDim
+            t.page.Visible = false
+        end
+        btn.BackgroundColor3 = C.accentDim
+        btn.TextColor3 = C.text
+        page.Visible = true
+        activeTab = name
+    end)
+
+    return btn, page
+end
+
+-- =========================================================
+-- COMPONENTS
+-- =========================================================
+local function createCard(parent, order, height)
+    local card = Instance.new("Frame")
+    card.Size = UDim2.new(1, -8, 0, height or 60)
+    card.BackgroundColor3 = C.card
+    card.BorderSizePixel = 0
+    card.LayoutOrder = order or 0
+    card.Parent = parent
+    corner(card, 10)
+    return card
+end
+
+local function createButton(parent, order, label, color, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -8, 0, 44)
+    btn.BackgroundColor3 = C.card
+    btn.Text = label
+    btn.TextColor3 = color or C.text
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 14
+    btn.AutoButtonColor = false
+    btn.LayoutOrder = order or 0
+    btn.Parent = parent
+    corner(btn, 10)
+    stroke(btn, C.border, 1)
+
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.12), {
+            BackgroundColor3 = C.accentDim
+        }):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.12), {
+            BackgroundColor3 = C.card
+        }):Play()
+    end)
+    btn.MouseButton1Click:Connect(function()
+        if callback then callback() end
+    end)
+
+    return btn
+end
+
+local function createToggle(parent, order, label, default, callback)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, -8, 0, 44)
+    row.BackgroundColor3 = C.card
+    row.BorderSizePixel = 0
+    row.LayoutOrder = order or 0
+    row.Parent = parent
+    corner(row, 10)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -80, 1, 0)
+    lbl.Position = UDim2.new(0, 14, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = label
+    lbl.TextColor3 = C.text
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 14
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = row
+
+    local sw = Instance.new("Frame")
+    sw.Size = UDim2.new(0, 46, 0, 24)
+    sw.Position = UDim2.new(1, -60, 0.5, -12)
+    sw.BackgroundColor3 = default and C.success or C.border
+    sw.Parent = row
+    corner(sw, 12)
+
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 18, 0, 18)
+    knob.Position = default and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
+    knob.BackgroundColor3 = C.text
+    knob.Parent = sw
+    corner(knob, 9)
+
+    local state = default
+
+    local function toggle()
+        state = not state
+        TweenService:Create(sw, TweenInfo.new(0.15), {
+            BackgroundColor3 = state and C.success or C.border
+        }):Play()
+        TweenService:Create(knob, TweenInfo.new(0.15), {
+            Position = state and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
+        }):Play()
+        if callback then callback(state) end
+    end
+
+    row.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            toggle()
+        end
+    end)
+
+    return row, function() return state end
+end
+
+-- =========================================================
+-- TAB 1: DASHBOARD
+-- =========================================================
+local _, dashPage = createTab("Dashboard", 1)
+
+local infoCard = createCard(dashPage, 1, 100)
+
+local function makeStat(parent, xPos, label, value)
+    local box = Instance.new("Frame")
+    box.Size = UDim2.new(0.33, -8, 1, -16)
+    box.Position = UDim2.new(xPos, 8, 0, 8)
+    box.BackgroundColor3 = C.panel
+    box.Parent = parent
+    corner(box, 8)
+
+    local val = Instance.new("TextLabel")
+    val.Size = UDim2.new(1, 0, 0.6, 0)
+    val.Position = UDim2.new(0, 0, 0, 6)
+    val.BackgroundTransparency = 1
+    val.Text = value
+    val.TextColor3 = C.accent
+    val.Font = Enum.Font.GothamBold
+    val.TextSize = 22
+    val.Parent = box
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, 0, 0.4, 0)
+    lbl.Position = UDim2.new(0, 0, 0.6, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = label
+    lbl.TextColor3 = C.textDim
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextSize = 11
+    lbl.Parent = box
+
+    return val
+end
+
+local statEggs = makeStat(infoCard, 0, "EGGS", "0")
+local statCoins = makeStat(infoCard, 0.333, "COINS", "0")
+local statTests = makeStat(infoCard, 0.666, "TESTS", "0")
+
+-- Update stats live
+task.spawn(function()
+    while gui.Parent do
+        local stats = player:FindFirstChild("leaderstats")
+        if stats then
+            local e = stats:FindFirstChild("Eggs")
+            local c = stats:FindFirstChild("Coins")
+            if e then statEggs.Text = tostring(e.Value) end
+            if c then statCoins.Text = tostring(c.Value) end
+        end
+        statTests.Text = tostring(#testLog)
+        task.wait(0.3)
+    end
+end)
+
+createButton(dashPage, 2, "⚡ Run All Tests", C.accent, function()
+    if _G.lil_jef then
+        _G.lil_jef()
+    else
+        warn("[lil jef] Test suite belum di-load. Cek lil_jef_test.client.lua")
+    end
+end)
+
+local autoRow = createToggle(dashPage, 3, "Auto-Run Tests (30s)", autoRun, function(state)
+    autoRun = state
+    if state then
+        task.spawn(function()
+            while autoRun do
+                task.wait(30)
+                if autoRun and _G.lil_jef then _G.lil_jef() end
+            end
+        end)
+    end
+end)
+
+createButton(dashPage, 4, "🗑 Clear Log", C.warn, function()
+    testLog = {}
+    if _G.lil_jefClearLog then _G.lil_jefClearLog() end
+end)
+
+-- =========================================================
+-- TAB 2: TESTS
+-- =========================================================
+local _, testsPage = createTab("Tests", 2)
+
+local testNames = {
+    "RT-1 · Remote Spam",
+    "RT-2 · Distance Bypass",
+    "RT-3 · Ownership Spoof",
+    "RT-4 · Speed Hack",
+    "RT-5 · God Mode",
+    "RT-6 · Arg Fuzzing",
+    "RT-7 · Hatch Spam",
+}
+
+local testButtons = {}
+
+local function runSingleTest(index)
+    if not _G.lil_jef_RunOne then
+        warn("[lil jef] RunOne belum tersedia. Update lil_jef_test.client.lua")
+        return
+    end
+    _G.lil_jef_RunOne(index)
+end
+
+for i, name in ipairs(testNames) do
+    local btn = createButton(testsPage, i, name, C.text, function()
+        runSingleTest(i)
+    end)
+    testButtons[i] = btn
+end
+
+-- =========================================================
+-- TAB 3: LOG
+-- =========================================================
+local _, logPage = createTab("Log", 3)
+
+local logBox = Instance.new("ScrollingFrame")
+logBox.Size = UDim2.new(1, -8, 1, 0)
+logBox.BackgroundColor3 = C.panel
+logBox.BorderSizePixel = 0
+logBox.ScrollBarThickness = 4
+logBox.ScrollBarImageColor3 = C.accentDim
+logBox.CanvasSize = UDim2.new(0, 0, 0, 0)
+logBox.AutomaticCanvasSize = Enum.AutomaticSize.Y
+logBox.LayoutOrder = 1
+logBox.Parent = logPage
+corner(logBox, 10)
+padding(logBox, 8)
+
+local logLayout = Instance.new("UIListLayout")
+logLayout.Padding = UDim.new(0, 4)
+logLayout.SortOrder = Enum.SortOrder.LayoutOrder
+logLayout.Parent = logBox
+
+local logOrder = 0
+
+_G.lil_jefAddLog = function(text, color)
+    logOrder += 1
+    local entry = Instance.new("TextLabel")
+    entry.Size = UDim2.new(1, -8, 0, 0)
+    entry.AutomaticSize = Enum.AutomaticSize.Y
+    entry.BackgroundTransparency = 1
+    entry.Text = "» " .. text
+    entry.TextColor3 = color or C.text
+    entry.Font = Enum.Font.Code
+    entry.TextSize = 12
+    entry.TextXAlignment = Enum.TextXAlignment.Left
+    entry.TextWrapped = true
+    entry.LayoutOrder = logOrder
+    entry.Parent = logBox
+
+    table.insert(testLog, { text = text, color = color })
+
+    task.wait()
+    logBox.CanvasPosition = Vector2.new(0, logBox.AbsoluteCanvasSize.Y)
+end
+
+_G.lil_jefClearLog = function()
+    for _, child in ipairs(logBox:GetChildren()) do
+        if child:IsA("TextLabel") then child:Destroy() end
+    end
+    testLog = {}
+    logOrder = 0
+end
+
+-- =========================================================
+-- TAB 4: INFO
+-- =========================================================
+local _, infoPage = createTab("Info", 4)
+
+local aboutCard = createCard(infoPage, 1, 140)
+
+local aboutTitle = Instance.new("TextLabel")
+aboutTitle.Size = UDim2.new(1, -24, 0, 30)
+aboutTitle.Position = UDim2.new(0, 12, 0, 10)
+aboutTitle.BackgroundTransparency = 1
+aboutTitle.Text = "lil jef v1.0"
+aboutTitle.TextColor3 = C.accent
+aboutTitle.Font = Enum.Font.GothamBold
+aboutTitle.TextSize = 18
+aboutTitle.TextXAlignment = Enum.TextXAlignment.Left
+aboutTitle.Parent = aboutCard
+
+local aboutText = Instance.new("TextLabel")
+aboutText.Size = UDim2.new(1, -24, 1, -50)
+aboutText.Position = UDim2.new(0, 12, 0, 44)
+aboutText.BackgroundTransparency = 1
+aboutText.Text = "Unified server-side protection + red team testing suite.\n\nDibuat oleh SouGPT untuk xso.\n\nGunakan hanya di game sendiri."
+aboutText.TextColor3 = C.text
+aboutText.Font = Enum.Font.Gotham
+aboutText.TextSize = 13
+aboutText.TextXAlignment = Enum.TextXAlignment.Left
+aboutText.TextYAlignment = Enum.TextYAlignment.Top
+aboutText.TextWrapped = true
+aboutText.Parent = aboutCard
+
+createButton(infoPage, 2, "🛡  Open Creator Docs", C.accent, function()
+    setclipboard and setclipboard("https://create.roblox.com/docs")
+end)
+
+createButton(infoPage, 3, "⚠️  Disclaimer", C.warn, function()
+    if _G.lil_jefAddLog then
+        _G.lil_jefAddLog("Gunakan lil jef hanya di game sendiri.", C.warn)
+        _G.lil_jefAddLog("Cheating di game orang = ban permanen.", C.fail)
+    end
+    -- pindah ke log
+    tabs["Log"].btn:Activate()
+end)
+
+-- =========================================================
+-- OPEN DEFAULT TAB
+-- =========================================================
+tabs["Dashboard"].btn:Activate()
+
+-- =========================================================
+-- TOGGLE MENU
+-- =========================================================
+local function openMenu()
+    menuOpen = true
+    win.Visible = true
+    win.Size = UDim2.new(0, 0, 0, 0)
+    TweenService:Create(win, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 420, 0, 520)
+    }):Play()
+end
+
+local function closeMenu()
+    menuOpen = false
+    TweenService:Create(win, TweenInfo.new(0.18), {
+        Size = UDim2.new(0, 0, 0, 0)
+    }):Play()
+    task.wait(0.2)
+    win.Visible = false
+end
+
+toggle.MouseButton1Click:Connect(function()
+    if menuOpen then closeMenu() else openMenu() end
+end)
+
+-- =========================================================
+-- KEYBIND: F2 = toggle menu
+-- =========================================================
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.F2 then
+        if menuOpen then closeMenu() else openMenu() end
+    end
+end)
+
+-- =========================================================
+-- HOOK LOG DARI TEST SUITE
+-- =========================================================
+-- Kalau test suite manggil print, kita intersep biar masuk ke GUI
+local mt = getrawmetatable and getrawmetatable(game)
+if mt then
+    local oldNamecall = mt.__namecall
+    -- skip: terlalu invasif. Cukup expose global.
+end
+
+-- Add initial log
+task.wait(0.5)
+if _G.lil_jefAddLog then
+    _G.lil_jefAddLog("lil jef menu loaded. Tekan F2 atau tombol LJ.", C.success)
+end
+
+print("[lil jef] Menu aktif. F2 untuk toggle.")
