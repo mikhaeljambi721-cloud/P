@@ -1,0 +1,616 @@
+--[[
+    lil jef — Control Menu (All-Numeric Edition)
+    Semua huruf di UI dikonversi jadi angka.
+    Mapping: A=1, B=2, ..., Z=26, spasi=0, pemisah "-"
+    by SouGPT untuk xso
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local EGGS = Workspace:WaitForChild("SpawnedEggs")
+local BASES = Workspace:WaitForChild("Bases")
+
+-- =========================================================
+-- LETTER → NUMBER CONVERTER
+-- =========================================================
+local function num(s)
+    s = tostring(s)
+    local out = {}
+    for i = 1, #s do
+        local c = s:sub(i, i)
+        local b = c:byte()
+        if b >= 65 and b <= 90 then          -- A-Z
+            table.insert(out, b - 64)
+        elseif b >= 97 and b <= 122 then     -- a-z
+            table.insert(out, b - 96)
+        elseif c == " " then
+            table.insert(out, 0)
+        else
+            table.insert(out, b)             -- simbol: pakai ASCII
+        end
+    end
+    return table.concat(out, "-")
+end
+
+-- expose buat test suite
+_G.lil_jefNum = num
+
+-- =========================================================
+-- STATE
+-- =========================================================
+local menuOpen = false
+local testLog = {}
+local autoRun = false
+
+local C = {
+    bg        = Color3.fromRGB(18, 18, 24),
+    panel     = Color3.fromRGB(26, 26, 34),
+    card      = Color3.fromRGB(34, 34, 44),
+    accent    = Color3.fromRGB(120, 200, 255),
+    accentDim = Color3.fromRGB(70, 120, 160),
+    success   = Color3.fromRGB(80, 220, 120),
+    fail      = Color3.fromRGB(255, 90, 90),
+    warn      = Color3.fromRGB(255, 200, 80),
+    text      = Color3.fromRGB(230, 230, 240),
+    textDim   = Color3.fromRGB(140, 140, 160),
+    border    = Color3.fromRGB(50, 50, 65),
+}
+
+local function corner(p, r) local c = Instance.new("UICorner") c.CornerRadius = UDim.new(0, r or 8) c.Parent = p return c end
+local function stroke(p, c, t) local s = Instance.new("UIStroke") s.Color = c or C.border s.Thickness = t or 1 s.Parent = p return s end
+local function padding(p, a) local x = Instance.new("UIPadding") x.PaddingTop = UDim.new(0, a) x.PaddingBottom = UDim.new(0, a) x.PaddingLeft = UDim.new(0, a) x.PaddingRight = UDim.new(0, a) x.Parent = p return x end
+
+-- =========================================================
+-- ROOT
+-- =========================================================
+local gui = Instance.new("ScreenGui")
+gui.Name = num("lil jef menu")
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = player:WaitForChild("PlayerGui")
+
+-- =========================================================
+-- TOGGLE BUTTON
+-- =========================================================
+local toggle = Instance.new("TextButton")
+toggle.Size = UDim2.new(0, 70, 0, 70)
+toggle.Position = UDim2.new(1, -90, 1, -90)
+toggle.BackgroundColor3 = C.panel
+toggle.Text = num("LJ")
+toggle.TextColor3 = C.accent
+toggle.Font = Enum.Font.GothamBold
+toggle.TextSize = 12
+toggle.AutoButtonColor = false
+toggle.TextScaled = true
+toggle.Parent = gui
+corner(toggle, 35)
+stroke(toggle, C.accent, 2)
+
+local toggleGrad = Instance.new("UIGradient")
+toggleGrad.Color = ColorSequence.new(C.accentDim, C.accent)
+toggleGrad.Rotation = 45
+toggleGrad.Parent = toggle
+
+-- =========================================================
+-- WINDOW
+-- =========================================================
+local win = Instance.new("Frame")
+win.Size = UDim2.new(0, 440, 0, 540)
+win.Position = UDim2.new(0.5, -220, 0.5, -270)
+win.BackgroundColor3 = C.bg
+win.BorderSizePixel = 0
+win.Visible = false
+win.Parent = gui
+corner(win, 14)
+stroke(win, C.accent, 1.5)
+
+-- =========================================================
+-- TITLE BAR
+-- =========================================================
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 52)
+titleBar.BackgroundColor3 = C.panel
+titleBar.BorderSizePixel = 0
+titleBar.Parent = win
+corner(titleBar, 14)
+
+local titleFix = Instance.new("Frame")
+titleFix.Size = UDim2.new(1, 0, 0, 14)
+titleFix.Position = UDim2.new(0, 0, 1, -14)
+titleFix.BackgroundColor3 = C.panel
+titleFix.BorderSizePixel = 0
+titleFix.Parent = titleBar
+
+local titleDot = Instance.new("Frame")
+titleDot.Size = UDim2.new(0, 10, 0, 10)
+titleDot.Position = UDim2.new(0, 18, 0.5, -5)
+titleDot.BackgroundColor3 = C.accent
+titleDot.Parent = titleBar
+corner(titleDot, 5)
+
+local titleText = Instance.new("TextLabel")
+titleText.Size = UDim2.new(1, -70, 1, 0)
+titleText.Position = UDim2.new(0, 40, 0, 0)
+titleText.BackgroundTransparency = 1
+titleText.Text = num("lil jef control panel")
+titleText.TextColor3 = C.text
+titleText.Font = Enum.Font.Code
+titleText.TextSize = 13
+titleText.TextXAlignment = Enum.TextXAlignment.Left
+titleText.Parent = titleBar
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -42, 0.5, -15)
+closeBtn.BackgroundColor3 = C.card
+closeBtn.Text = num("X")
+closeBtn.TextColor3 = C.text
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 13
+closeBtn.AutoButtonColor = false
+closeBtn.Parent = titleBar
+corner(closeBtn, 8)
+
+closeBtn.MouseEnter:Connect(function()
+    TweenService:Create(closeBtn, TweenInfo.new(0.15), {BackgroundColor3 = C.fail}):Play()
+end)
+closeBtn.MouseLeave:Connect(function()
+    TweenService:Create(closeBtn, TweenInfo.new(0.15), {BackgroundColor3 = C.card}):Play()
+end)
+closeBtn.MouseButton1Click:Connect(function() win.Visible = false menuOpen = false end)
+
+-- Drag
+local function makeDraggable(frame, handle)
+    local dragging, dragStart, startPos = false, nil, nil
+    handle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+        end
+    end)
+    handle.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if not dragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+            local d = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+        end
+    end)
+end
+makeDraggable(win, titleBar)
+
+-- =========================================================
+-- STATUS BAR
+-- =========================================================
+local statusBar = Instance.new("Frame")
+statusBar.Size = UDim2.new(1, -28, 0, 42)
+statusBar.Position = UDim2.new(0, 14, 0, 62)
+statusBar.BackgroundColor3 = C.card
+statusBar.BorderSizePixel = 0
+statusBar.Parent = win
+corner(statusBar, 10)
+
+local statusDot = Instance.new("Frame")
+statusDot.Size = UDim2.new(0, 10, 0, 10)
+statusDot.Position = UDim2.new(0, 14, 0.5, -5)
+statusDot.BackgroundColor3 = C.success
+statusDot.Parent = statusBar
+corner(statusDot, 5)
+
+local statusText = Instance.new("TextLabel")
+statusText.Size = UDim2.new(1, -40, 1, 0)
+statusText.Position = UDim2.new(0, 32, 0, 0)
+statusText.BackgroundTransparency = 1
+statusText.Text = num("lil jef aktif memantau")
+statusText.TextColor3 = C.text
+statusText.Font = Enum.Font.Code
+statusText.TextSize = 11
+statusText.TextXAlignment = Enum.TextXAlignment.Left
+statusText.Parent = statusBar
+
+task.spawn(function()
+    while gui.Parent do
+        TweenService:Create(statusDot, TweenInfo.new(0.8), {BackgroundTransparency = 0.5}):Play()
+        task.wait(0.8)
+        TweenService:Create(statusDot, TweenInfo.new(0.8), {BackgroundTransparency = 0}):Play()
+        task.wait(0.8)
+    end
+end)
+
+-- =========================================================
+-- TAB BAR
+-- =========================================================
+local tabBar = Instance.new("Frame")
+tabBar.Size = UDim2.new(1, -28, 0, 38)
+tabBar.Position = UDim2.new(0, 14, 0, 114)
+tabBar.BackgroundTransparency = 1
+tabBar.Parent = win
+
+local tabLayout = Instance.new("UIListLayout")
+tabLayout.FillDirection = Enum.FillDirection.Horizontal
+tabLayout.Padding = UDim.new(0, 8)
+tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+tabLayout.Parent = tabBar
+
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1, -28, 1, -230)
+content.Position = UDim2.new(0, 14, 0, 160)
+content.BackgroundTransparency = 1
+content.Parent = win
+
+-- =========================================================
+-- TAB SYSTEM
+-- =========================================================
+local tabs = {}
+
+local function createTab(label, key, order)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 60, 0, 34)
+    btn.BackgroundColor3 = C.card
+    btn.Text = label
+    btn.TextColor3 = C.textDim
+    btn.Font = Enum.Font.Code
+    btn.TextSize = 11
+    btn.AutoButtonColor = false
+    btn.TextScaled = true
+    btn.LayoutOrder = order
+    btn.Parent = tabBar
+    corner(btn, 8)
+
+    local page = Instance.new("ScrollingFrame")
+    page.Size = UDim2.new(1, 0, 1, 0)
+    page.BackgroundTransparency = 1
+    page.BorderSizePixel = 0
+    page.ScrollBarThickness = 4
+    page.ScrollBarImageColor3 = C.accentDim
+    page.CanvasSize = UDim2.new(0, 0, 0, 0)
+    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    page.Visible = false
+    page.Parent = content
+    padding(page, 4)
+
+    local lay = Instance.new("UIListLayout")
+    lay.Padding = UDim.new(0, 8)
+    lay.SortOrder = Enum.SortOrder.LayoutOrder
+    lay.Parent = page
+
+    tabs[key] = { btn = btn, page = page }
+
+    btn.MouseButton1Click:Connect(function()
+        for _, t in pairs(tabs) do
+            t.btn.BackgroundColor3 = C.card
+            t.btn.TextColor3 = C.textDim
+            t.page.Visible = false
+        end
+        btn.BackgroundColor3 = C.accentDim
+        btn.TextColor3 = C.text
+        page.Visible = true
+    end)
+
+    return btn, page
+end
+
+-- =========================================================
+-- COMPONENTS
+-- =========================================================
+local function createCard(parent, order, height)
+    local card = Instance.new("Frame")
+    card.Size = UDim2.new(1, -8, 0, height or 60)
+    card.BackgroundColor3 = C.card
+    card.BorderSizePixel = 0
+    card.LayoutOrder = order or 0
+    card.Parent = parent
+    corner(card, 10)
+    return card
+end
+
+local function createButton(parent, order, label, color, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -8, 0, 44)
+    btn.BackgroundColor3 = C.card
+    btn.Text = label
+    btn.TextColor3 = color or C.text
+    btn.Font = Enum.Font.Code
+    btn.TextSize = 12
+    btn.TextScaled = true
+    btn.AutoButtonColor = false
+    btn.LayoutOrder = order or 0
+    btn.Parent = parent
+    corner(btn, 10)
+    stroke(btn, C.border, 1)
+
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = C.accentDim}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = C.card}):Play()
+    end)
+    btn.MouseButton1Click:Connect(function() if callback then callback() end end)
+    return btn
+end
+
+local function createToggle(parent, order, label, default, callback)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, -8, 0, 44)
+    row.BackgroundColor3 = C.card
+    row.BorderSizePixel = 0
+    row.LayoutOrder = order or 0
+    row.Parent = parent
+    corner(row, 10)
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -80, 1, 0)
+    lbl.Position = UDim2.new(0, 14, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = label
+    lbl.TextColor3 = C.text
+    lbl.Font = Enum.Font.Code
+    lbl.TextSize = 11
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = row
+
+    local sw = Instance.new("Frame")
+    sw.Size = UDim2.new(0, 46, 0, 24)
+    sw.Position = UDim2.new(1, -60, 0.5, -12)
+    sw.BackgroundColor3 = default and C.success or C.border
+    sw.Parent = row
+    corner(sw, 12)
+
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 18, 0, 18)
+    knob.Position = default and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
+    knob.BackgroundColor3 = C.text
+    knob.Parent = sw
+    corner(knob, 9)
+
+    local state = default
+    row.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            state = not state
+            TweenService:Create(sw, TweenInfo.new(0.15), {
+                BackgroundColor3 = state and C.success or C.border
+            }):Play()
+            TweenService:Create(knob, TweenInfo.new(0.15), {
+                Position = state and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
+            }):Play()
+            if callback then callback(state) end
+        end
+    end)
+
+    return row
+end
+
+-- =========================================================
+-- TAB 1 — DASHBOARD  (label: "dashboard" = 4-1-19-8-2-15-1-18-4)
+-- =========================================================
+local _, dashPage = createTab(num("dashboard"), "dash", 1)
+
+local infoCard = createCard(dashPage, 1, 100)
+
+local function makeStat(parent, xPos, value)
+    local box = Instance.new("Frame")
+    box.Size = UDim2.new(0.33, -8, 1, -16)
+    box.Position = UDim2.new(xPos, 8, 0, 8)
+    box.BackgroundColor3 = C.panel
+    box.Parent = parent
+    corner(box, 8)
+
+    local val = Instance.new("TextLabel")
+    val.Size = UDim2.new(1, 0, 1, 0)
+    val.BackgroundTransparency = 1
+    val.Text = value
+    val.TextColor3 = C.accent
+    val.Font = Enum.Font.GothamBold
+    val.TextSize = 22
+    val.Parent = box
+    return val
+end
+
+local statEggs  = makeStat(infoCard, 0,     "0")
+local statCoins = makeStat(infoCard, 0.333, "0")
+local statTests = makeStat(infoCard, 0.666, "0")
+
+task.spawn(function()
+    while gui.Parent do
+        local stats = player:FindFirstChild("leaderstats")
+        if stats then
+            local e = stats:FindFirstChild("Eggs")
+            local c = stats:FindFirstChild("Coins")
+            if e then statEggs.Text = tostring(e.Value) end
+            if c then statCoins.Text = tostring(c.Value) end
+        end
+        statTests.Text = tostring(#testLog)
+        task.wait(0.3)
+    end
+end)
+
+-- tombol "run all tests" → 18-21-14 1-12-12 20-5-19-20-19
+createButton(dashPage, 2, num("run all tests"), C.accent, function()
+    if _G.lil_jef then _G.lil_jef() end
+end)
+
+-- toggle "auto run"
+createToggle(dashPage, 3, num("auto run"), autoRun, function(state)
+    autoRun = state
+    if state then
+        task.spawn(function()
+            while autoRun do
+                task.wait(30)
+                if autoRun and _G.lil_jef then _G.lil_jef() end
+            end
+        end)
+    end
+end)
+
+-- tombol "clear log"
+createButton(dashPage, 4, num("clear log"), C.warn, function()
+    testLog = {}
+    if _G.lil_jefClearLog then _G.lil_jefClearLog() end
+end)
+
+-- =========================================================
+-- TAB 2 — TESTS
+-- =========================================================
+local _, testsPage = createTab(num("tests"), "tests", 2)
+
+local testNames = {
+    "remote spam",
+    "distance bypass",
+    "ownership spoof",
+    "speed hack",
+    "god mode",
+    "arg fuzzing",
+    "hatch spam",
+}
+
+for i = 1, 7 do
+    createButton(testsPage, i, num(testNames[i]), C.text, function()
+        if _G.lil_jef_RunOne then _G.lil_jef_RunOne(i) end
+    end)
+end
+
+-- =========================================================
+-- TAB 3 — LOG
+-- =========================================================
+local _, logPage = createTab(num("log"), "log", 3)
+
+local logBox = Instance.new("ScrollingFrame")
+logBox.Size = UDim2.new(1, -8, 1, 0)
+logBox.BackgroundColor3 = C.panel
+logBox.BorderSizePixel = 0
+logBox.ScrollBarThickness = 4
+logBox.ScrollBarImageColor3 = C.accentDim
+logBox.CanvasSize = UDim2.new(0, 0, 0, 0)
+logBox.AutomaticCanvasSize = Enum.AutomaticSize.Y
+logBox.LayoutOrder = 1
+logBox.Parent = logPage
+corner(logBox, 10)
+padding(logBox, 8)
+
+local logLayout = Instance.new("UIListLayout")
+logLayout.Padding = UDim.new(0, 4)
+logLayout.SortOrder = Enum.SortOrder.LayoutOrder
+logLayout.Parent = logBox
+
+local logOrder = 0
+
+_G.lil_jefAddLog = function(text, color)
+    logOrder += 1
+    local entry = Instance.new("TextLabel")
+    entry.Size = UDim2.new(1, -8, 0, 0)
+    entry.AutomaticSize = Enum.AutomaticSize.Y
+    entry.BackgroundTransparency = 1
+    entry.Text = num(text)   -- <-- semua log dikonversi jadi angka
+    entry.TextColor3 = color or C.text
+    entry.Font = Enum.Font.Code
+    entry.TextSize = 10
+    entry.TextXAlignment = Enum.TextXAlignment.Left
+    entry.TextWrapped = true
+    entry.LayoutOrder = logOrder
+    entry.Parent = logBox
+    table.insert(testLog, { text = text, color = color })
+    task.wait()
+    logBox.CanvasPosition = Vector2.new(0, logBox.AbsoluteCanvasSize.Y)
+end
+
+_G.lil_jefClearLog = function()
+    for _, child in ipairs(logBox:GetChildren()) do
+        if child:IsA("TextLabel") then child:Destroy() end
+    end
+    testLog = {}
+    logOrder = 0
+end
+
+-- =========================================================
+-- TAB 4 — INFO
+-- =========================================================
+local _, infoPage = createTab(num("info"), "info", 4)
+
+local aboutCard = createCard(infoPage, 1, 140)
+
+local aboutTitle = Instance.new("TextLabel")
+aboutTitle.Size = UDim2.new(1, -24, 0, 30)
+aboutTitle.Position = UDim2.new(0, 12, 0, 10)
+aboutTitle.BackgroundTransparency = 1
+aboutTitle.Text = num("lil jef v1")
+aboutTitle.TextColor3 = C.accent
+aboutTitle.Font = Enum.Font.Code
+aboutTitle.TextSize = 12
+aboutTitle.TextXAlignment = Enum.TextXAlignment.Left
+aboutTitle.Parent = aboutCard
+
+local aboutText = Instance.new("TextLabel")
+aboutText.Size = UDim2.new(1, -24, 1, -50)
+aboutText.Position = UDim2.new(0, 12, 0, 44)
+aboutText.BackgroundTransparency = 1
+aboutText.Text = num("unified server side protection and red team testing suite built by sougpt for xso use only on your own game")
+aboutText.TextColor3 = C.text
+aboutText.Font = Enum.Font.Code
+aboutText.TextSize = 10
+aboutText.TextXAlignment = Enum.TextXAlignment.Left
+aboutText.TextYAlignment = Enum.TextYAlignment.Top
+aboutText.TextWrapped = true
+aboutText.Parent = aboutCard
+
+createButton(infoPage, 2, num("open creator docs"), C.accent, function()
+    if setclipboard then setclipboard("https://create.roblox.com/docs") end
+end)
+
+createButton(infoPage, 3, num("disclaimer"), C.warn, function()
+    if _G.lil_jefAddLog then
+        _G.lil_jefAddLog("use lil jef only on your own game", C.warn)
+        _G.lil_jefAddLog("cheating on others game equals permanent ban", C.fail)
+    end
+    tabs["log"].btn:Activate()
+end)
+
+-- =========================================================
+-- OPEN DEFAULT
+-- =========================================================
+tabs["dash"].btn:Activate()
+
+local function openMenu()
+    menuOpen = true
+    win.Visible = true
+    win.Size = UDim2.new(0, 0, 0, 0)
+    TweenService:Create(win, TweenInfo.new(0.25, Enum.EasingStyle.Back), {
+        Size = UDim2.new(0, 440, 0, 540)
+    }):Play()
+end
+
+local function closeMenu()
+    menuOpen = false
+    TweenService:Create(win, TweenInfo.new(0.18), {
+        Size = UDim2.new(0, 0, 0, 0)
+    }):Play()
+    task.wait(0.2)
+    win.Visible = false
+end
+
+toggle.MouseButton1Click:Connect(function()
+    if menuOpen then closeMenu() else openMenu() end
+end)
+
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.F2 then
+        if menuOpen then closeMenu() else openMenu() end
+    end
+end)
+
+print(num("lil jef menu ready"))
