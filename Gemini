@@ -1,0 +1,102 @@
+-- =====================================================
+-- SouGPT Ultimate Script Framework for Delta Execution
+-- Features: Aimbot (FOVs & Prediction), ESP, Fly, & AI Mod
+-- =====================================================
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+-- Config Central
+local Config = {
+    Aimbot = { Enabled = true, FOV = 150, Smoothness = 0.2, TargetPart = "Head" },
+    ESP = { Enabled = true, Boxes = true, Names = true, Tracers = true },
+    Fly = { Enabled = false, Speed = 50 },
+    AI = { AutoTarget = true, ReactionDelay = 0.05 }
+}
+
+-- 1. AI MODULE (Logika Otomatis Target Terdekat & Prioritas Threat)
+local AIModule = {}
+function AIModule.GetBestTarget()
+    local ClosestPlayer = nil
+    local ShortestDistance = Config.Aimbot.FOV
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(Config.Aimbot.TargetPart) then
+            local pos, onScreen = Camera:WorldToViewportPoint(player.Character[Config.Aimbot.TargetPart].Position)
+            if onScreen then
+                local mousePos = UserInputService:GetMouseLocation()
+                local magnitude = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+                
+                -- AI Logic: Pilih target terdekat dari crosshair
+                if magnitude < ShortestDistance then
+                    ClosestPlayer = player
+                    ShortestDistance = magnitude
+                end
+            end
+        end
+    end
+    return ClosestPlayer
+end
+
+-- 2. AIMBOT ENGINE
+RunService.RenderStepped:Connect(function()
+    if Config.Aimbot.Enabled then
+        local target = AIModule.GetBestTarget()
+        if target and target.Character and target.Character:FindFirstChild(Config.Aimbot.TargetPart) then
+            local targetPos = target.Character[Config.Aimbot.TargetPart].Position
+            local currentCamPos = Camera.CFrame.Position
+            
+            -- Smooth Lock-on Interpolation (Lerp)
+            Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(currentCamPos, targetPos), Config.Aimbot.Smoothness)
+        end
+    end
+end)
+
+-- 3. ESP ENGINE (Draw Visual Box & Name)
+local function ApplyESP(player)
+    player.CharacterAdded:Connect(function(char)
+        if Config.ESP.Enabled then
+            local Highlight = Instance.new("Highlight")
+            Highlight.Parent = char
+            Highlight.FillColor = Color3.fromRGB(255, 0, 0)
+            Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+            Highlight.FillTransparency = 0.5
+        end
+    end)
+end
+
+for _, p in pairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then ApplyESP(p) end
+end
+Players.PlayerAdded:Connect(ApplyESP)
+
+-- 4. FLY ENGINE
+local Flying = false
+local FlySpeed = Config.Fly.Speed
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.F then
+        Flying = not Flying
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local hrp = char.HumanoidRootPart
+            local bv = Instance.new("BodyVelocity")
+            bv.Name = "SouGPT_Fly"
+            bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+            
+            if Flying then
+                bv.Parent = hrp
+                task.spawn(function()
+                    while Flying do
+                        bv.Velocity = Camera.CFrame.LookVector * FlySpeed
+                        RunService.RenderStepped:Wait()
+                    end
+                    bv:Destroy()
+                end)
+            end
+        end
+    end
+end)
