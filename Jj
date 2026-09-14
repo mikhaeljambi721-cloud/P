@@ -1,0 +1,218 @@
+--[[
+    GARUDA-X SUITE v1.0
+    HANYA TARGET OKNUM BERTATO GARUDA MERAH
+    Korban & sipil = PROTEKSI TOTAL
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInput = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LP = Players.LocalPlayer
+
+-- ============ CONFIG ============
+local CONFIG = {
+    Aimbot = {
+        Enabled = true,
+        FOV = 200,
+        Smoothness = 0.28,
+        TargetPart = "Head",
+        WallCheck = true,
+        OknumOnly = true,   -- WAJIB: hanya oknum Garuda
+    },
+    ESP = {
+        Enabled = true,
+        OknumColor = Color3.fromRGB(255, 0, 51),
+        KorbanColor = Color3.fromRGB(0, 255, 100),
+        ShowTracer = true,
+        ShowName = true,
+    },
+    Fly = {
+        Enabled = false,
+        Speed = 80,
+    },
+    NoClip = {
+        Enabled = false,
+    },
+    AI = {
+        Enabled = true,
+        AutoEngage = true,
+        ReactionTime = 0.08,
+        Priority = "NearestOknum",
+    }
+}
+
+-- ============ OKNUM DATABASE ============
+local OKNUM_TATTOO_ID = "garuda_merah"
+local PROTECTED_NAMES = {"Korban", "Warga", "Anak", "Ibu", "Lansia"}
+
+local function isOknum(plr)
+    if not plr or not plr.Character then return false end
+    -- Cek atribut tato Garuda merah
+    local hasTattoo = plr:GetAttribute("Tattoo") == OKNUM_TATTOO_ID
+        or plr.Character:FindFirstChild("GarudaMerah") ~= nil
+    return hasTattoo
+end
+
+local function isProtected(plr)
+    for _, n in ipairs(PROTECTED_NAMES) do
+        if plr.Name:find(n) then return true end
+    end
+    return false
+end
+
+-- ============ AIMBOT ============
+local function getOknumTargets()
+    local list = {}
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LP and isOknum(plr) and not isProtected(plr) then
+            table.insert(list, plr)
+        end
+    end
+    return list
+end
+
+local function getClosestToCursor()
+    local best, bestD = nil, CONFIG.Aimbot.FOV
+    local mouse = UserInput:GetMouseLocation()
+    for _, plr in ipairs(getOknumTargets()) do
+        local part = plr.Character and plr.Character:FindFirstChild(CONFIG.Aimbot.TargetPart)
+        if part then
+            local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+            if onScreen then
+                local d = (Vector2.new(pos.X, pos.Y) - mouse).Magnitude
+                if d < bestD then
+                    bestD = d
+                    best = part
+                end
+            end
+        end
+    end
+    return best
+end
+
+RunService.RenderStepped:Connect(function()
+    if not CONFIG.Aimbot.Enabled then return end
+    local target = getClosestToCursor()
+    if target then
+        local cam = Camera.CFrame
+        local dir = (target.Position - cam.Position).Unit
+        Camera.CFrame = cam:Lerp(CFrame.new(cam.Position, cam.Position + dir),
+            1 - CONFIG.Aimbot.Smoothness)
+    end
+end)
+
+-- ============ ESP ============
+local espCache = {}
+local function createESP(plr)
+    if espCache[plr] then return end
+    local box = Drawing.new("Square")
+    box.Thickness = 2
+    box.Filled = false
+    box.Transparency = 1
+    local name = Drawing.new("Text")
+    name.Size = 14
+    name.Center = true
+    name.Outline = true
+    local tracer = Drawing.new("Line")
+    tracer.Thickness = 1
+    tracer.Transparency = 1
+    espCache[plr] = {box = box, name = name, tracer = tracer}
+end
+
+RunService.RenderStepped:Connect(function()
+    if not CONFIG.ESP.Enabled then return end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LP then
+            createESP(plr)
+            local e = espCache[plr]
+            local char = plr.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                if onScreen then
+                    local oknum = isOknum(plr)
+                    local protected = isProtected(plr)
+                    local color = protected and CONFIG.ESP.KorbanColor
+                        or (oknum and CONFIG.ESP.OknumColor or Color3.new(1,1,1))
+                    local size = 1500 / pos.Z
+                    e.box.Size = Vector2.new(size, size * 1.4)
+                    e.box.Position = Vector2.new(pos.X - size/2, pos.Y - size*0.7)
+                    e.box.Color = color
+                    e.box.Visible = true
+
+                    e.name.Text = protected and "[KORBAN]" or (oknum and "[OKNUM]" or plr.Name)
+                    e.name.Position = Vector2.new(pos.X, pos.Y - size)
+                    e.name.Color = color
+                    e.name.Visible = true
+
+                    if CONFIG.ESP.ShowTracer then
+                        e.tracer.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                        e.tracer.To = Vector2.new(pos.X, pos.Y)
+                        e.tracer.Color = color
+                        e.tracer.Visible = true
+                    end
+                else
+                    e.box.Visible = false
+                    e.name.Visible = false
+                    e.tracer.Visible = false
+                end
+            end
+        end
+    end
+end)
+
+-- ============ FLY ============
+local flyBodyGyro, flyBodyVel
+local function toggleFly(state)
+    local char = LP.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    if state then
+        flyBodyGyro = Instance.new("BodyGyro", hrp)
+        flyBodyGyro.P = 9e4
+        flyBodyGyro.MaxTorque = Vector3.new(9e9,9e9,9e9)
+        flyBodyVel = Instance.new("BodyVelocity", hrp)
+        flyBodyVel.MaxForce = Vector3.new(9e9,9e9,9e9)
+    else
+        if flyBodyGyro then flyBodyGyro:Destroy() end
+        if flyBodyVel then flyBodyVel:Destroy() end
+    end
+end
+
+UserInput.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.F then
+        CONFIG.Fly.Enabled = not CONFIG.Fly.Enabled
+        toggleFly(CONFIG.Fly.Enabled)
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if CONFIG.Fly.Enabled and flyBodyVel then
+        local cam = Camera.CFrame
+        local move = Vector3.new()
+        if UserInput:IsKeyDown(Enum.KeyCode.W) then move += cam.LookVector end
+        if UserInput:IsKeyDown(Enum.KeyCode.S) then move -= cam.LookVector end
+        if UserInput:IsKeyDown(Enum.KeyCode.A) then move -= cam.RightVector end
+        if UserInput:IsKeyDown(Enum.KeyCode.D) then move += cam.RightVector end
+        flyBodyVel.Velocity = move * CONFIG.Fly.Speed
+        flyBodyGyro.CFrame = cam
+    end
+end)
+
+-- ============ NOCLIP ============
+RunService.Stepped:Connect(function()
+    if CONFIG.NoClip.Enabled and LP.Character then
+        for _, p in ipairs(LP.Character:GetDescendants()) do
+            if p:IsA("BasePart") and p.CanCollide then
+                p.CanCollide = false
+            end
+        end
+    end
+end)
+
+UserInput.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.N then
+        CONFIG.NoClip.Enabled = not CONFIG.NoClip.Enabled
+    end
+end)
