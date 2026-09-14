@@ -1,0 +1,283 @@
+--[[
+    GARUDA AIM MENU v3 - KEYED
+    HANYA TARGET OKNUM GARUDA MERAH
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInput = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LP = Players.LocalPlayer
+local CoreGui = game:GetService("CoreGui")
+
+-- ============ KEY SYSTEM ============
+local VALID_KEYS = {
+    ["GARUDA-2024-BAR-ALPHA"]   = true,
+    ["GARUDA-2024-BAR-BRAVO"]   = true,
+    ["GARUDA-2024-BAR-CHARLIE"] = true,
+    ["GARUDA-2024-BAR-DELTA"]   = true,
+    ["GARUDA-2024-BAR-ECHO"]    = true,
+}
+
+-- ============ UI KEY GATE ============
+local function showKeyPrompt(callback)
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "GarudaKeyGate"
+    gui.ResetOnSpawn = false
+    gui.Parent = LP:WaitForChild("PlayerGui")
+
+    local bg = Instance.new("Frame")
+    bg.Size = UDim2.new(0, 320, 0, 180)
+    bg.Position = UDim2.new(0.5, -160, 0.5, -90)
+    bg.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
+    bg.BorderSizePixel = 0
+    bg.Parent = gui
+    Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 12)
+
+    local t = Instance.new("TextLabel")
+    t.Size = UDim2.new(1, 0, 0, 36)
+    t.BackgroundColor3 = Color3.fromRGB(255, 0, 51)
+    t.Text = "🔒 GARUDA KEY REQUIRED"
+    t.TextColor3 = Color3.new(1, 1, 1)
+    t.Font = Enum.Font.GothamBold
+    t.TextSize = 14
+    t.Parent = bg
+    Instance.new("UICorner", t).CornerRadius = UDim.new(0, 12)
+
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(0, 280, 0, 36)
+    box.Position = UDim2.new(0, 20, 0, 55)
+    box.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    box.Text = ""
+    box.PlaceholderText = "Masukkan key Bar..."
+    box.TextColor3 = Color3.new(1, 1, 1)
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 12
+    box.Parent = bg
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 280, 0, 36)
+    btn.Position = UDim2.new(0, 20, 0, 100)
+    btn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    btn.Text = "VERIFIKASI"
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.Parent = bg
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+    local status = Instance.new("TextLabel")
+    status.Size = UDim2.new(1, 0, 0, 20)
+    status.Position = UDim2.new(0, 0, 1, -28)
+    status.BackgroundTransparency = 1
+    status.Text = ""
+    status.TextColor3 = Color3.fromRGB(255, 100, 100)
+    status.Font = Enum.Font.Gotham
+    status.TextSize = 11
+    status.Parent = bg
+
+    btn.MouseButton1Click:Connect(function()
+        local key = box.Text
+        if VALID_KEYS[key] then
+            status.Text = "✓ AKSES DITERIMA - Selamat bertugas, Bar"
+            status.TextColor3 = Color3.fromRGB(0, 255, 100)
+            task.wait(1)
+            gui:Destroy()
+            callback(true)
+        else
+            status.Text = "✗ KEY INVALID - Oknum terdeteksi!"
+            status.TextColor3 = Color3.fromRGB(255, 0, 51)
+            box.Text = ""
+        end
+    end)
+end
+
+-- ============ CONFIG ============
+local CONFIG = {
+    Enabled = true,
+    FOV = 200,
+    Smoothness = 0.28,
+    TargetPart = "Head",
+    ShowFOV = true,
+    OknumOnly = true,
+}
+
+-- ============ OKNUM CHECK ============
+local function isOknum(plr)
+    if not plr or not plr.Character then return false end
+    return plr:GetAttribute("Tattoo") == "garuda_merah"
+        or plr.Character:FindFirstChild("GarudaMerah") ~= nil
+end
+
+local function isProtected(plr)
+    local n = {"Korban", "Warga", "Anak", "Ibu", "Lansia"}
+    for _, x in ipairs(n) do
+        if plr.Name:find(x) then return true end
+    end
+    return false
+end
+
+-- ============ UI MENU ============
+local function createMenu()
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "GarudaAimMenu"
+    gui.ResetOnSpawn = false
+    gui.Parent = LP:WaitForChild("PlayerGui")
+
+    local Main = Instance.new("Frame")
+    Main.Size = UDim2.new(0, 260, 0, 340)
+    Main.Position = UDim2.new(0, 20, 0, 100)
+    Main.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+    Main.BorderSizePixel = 0
+    Main.Active = true
+    Main.Draggable = true
+    Main.Parent = gui
+    Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 10)
+
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(1, 0, 0, 32)
+    Title.BackgroundColor3 = Color3.fromRGB(255, 0, 51)
+    Title.Text = "GARUDA AIM v3 🔑"
+    Title.TextColor3 = Color3.new(1, 1, 1)
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 14
+    Title.Parent = Main
+    Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 10)
+
+    local function toggle(name, y, default, cb)
+        local B = Instance.new("TextButton")
+        B.Size = UDim2.new(0, 220, 0, 32)
+        B.Position = UDim2.new(0, 20, 0, y)
+        B.BackgroundColor3 = default and Color3.fromRGB(0, 200, 100)
+            or Color3.fromRGB(50, 50, 60)
+        B.Text = name .. ": " .. (default and "ON" or "OFF")
+        B.TextColor3 = Color3.new(1, 1, 1)
+        B.Font = Enum.Font.Gotham
+        B.TextSize = 12
+        B.Parent = Main
+        Instance.new("UICorner", B).CornerRadius = UDim.new(0, 6)
+        local s = default
+        B.MouseButton1Click:Connect(function()
+            s = not s
+            B.BackgroundColor3 = s and Color3.fromRGB(0, 200, 100)
+                or Color3.fromRGB(50, 50, 60)
+            B.Text = name .. ": " .. (s and "ON" or "OFF")
+            cb(s)
+        end)
+    end
+
+    local function slider(name, y, min, max, default, cb)
+        local F = Instance.new("Frame")
+        F.Size = UDim2.new(0, 220, 0, 40)
+        F.Position = UDim2.new(0, 20, 0, y)
+        F.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+        F.Parent = Main
+        Instance.new("UICorner", F).CornerRadius = UDim.new(0, 6)
+
+        local L = Instance.new("TextLabel")
+        L.Size = UDim2.new(1, 0, 0, 18)
+        L.BackgroundTransparency = 1
+        L.Text = name .. ": " .. default
+        L.TextColor3 = Color3.new(1, 1, 1)
+        L.Font = Enum.Font.Gotham
+        L.TextSize = 11
+        L.Parent = F
+
+        local Bar = Instance.new("Frame")
+        Bar.Size = UDim2.new(0, 200, 0, 8)
+        Bar.Position = UDim2.new(0, 10, 0, 24)
+        Bar.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+        Bar.Parent = F
+        Instance.new("UICorner", Bar).CornerRadius = UDim.new(0, 4)
+
+        local Fill = Instance.new("Frame")
+        Fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+        Fill.BackgroundColor3 = Color3.fromRGB(255, 0, 51)
+        Fill.Parent = Bar
+        Instance.new("UICorner", Fill).CornerRadius = UDim.new(0, 4)
+
+        local drag = false
+        Bar.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 then drag = true end
+        end)
+        UserInput.InputEnded:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 then drag = false end
+        end)
+        UserInput.InputChanged:Connect(function(i)
+            if drag and i.UserInputType == Enum.UserInputType.MouseMovement then
+                local r = math.clamp((i.Position.X - Bar.AbsolutePosition.X) / Bar.AbsoluteSize.X, 0, 1)
+                Fill.Size = UDim2.new(r, 0, 1, 0)
+                local v = math.floor(min + (max - min) * r)
+                L.Text = name .. ": " .. v
+                cb(v)
+            end
+        end)
+    end
+
+    toggle("Aimbot", 45, true, function(v) CONFIG.Enabled = v end)
+    toggle("Show FOV", 82, true, function(v) CONFIG.ShowFOV = v end)
+    toggle("Oknum Only", 119, true, function(v) CONFIG.OknumOnly = v end)
+    slider("FOV", 160, 50, 500, 200, function(v) CONFIG.FOV = v end)
+    slider("Smooth", 208, 1, 100, 28, function(v) CONFIG.Smoothness = v / 100 end)
+
+    local info = Instance.new("TextLabel")
+    info.Size = UDim2.new(1, 0, 0, 20)
+    info.Position = UDim2.new(0, 0, 1, -25)
+    info.BackgroundTransparency = 1
+    info.Text = "🔑 KEY VALID — Bar, kamu aman"
+    info.TextColor3 = Color3.fromRGB(0, 255, 100)
+    info.Font = Enum.Font.Gotham
+    info.TextSize = 10
+    info.Parent = Main
+end
+
+-- ============ AIMBOT ============
+local function getTarget()
+    local best, bestD = nil, CONFIG.FOV
+    local mouse = UserInput:GetMouseLocation()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LP and isOknum(plr) and not isProtected(plr) then
+            local p = plr.Character and plr.Character:FindFirstChild(CONFIG.TargetPart)
+            if p then
+                local pos, on = Camera:WorldToViewportPoint(p.Position)
+                if on then
+                    local d = (Vector2.new(pos.X, pos.Y) - mouse).Magnitude
+                    if d < bestD then bestD = d; best = p end
+                end
+            end
+        end
+    end
+    return best
+end
+
+RunService.RenderStepped:Connect(function()
+    if not CONFIG.Enabled then return end
+    local t = getTarget()
+    if t then
+        local c = Camera.CFrame
+        local dir = (t.Position - c.Position).Unit
+        Camera.CFrame = c:Lerp(CFrame.new(c.Position, c.Position + dir),
+            1 - CONFIG.Smoothness)
+    end
+end)
+
+-- ============ FOV CIRCLE ============
+local circle = Drawing.new("Circle")
+circle.Thickness = 2
+circle.Color = Color3.fromRGB(255, 0, 51)
+circle.Filled = false
+circle.Transparency = 0.6
+RunService.RenderStepped:Connect(function()
+    circle.Visible = CONFIG.ShowFOV
+    circle.Position = UserInput:GetMouseLocation()
+    circle.Radius = CONFIG.FOV
+end)
+
+-- ============ START ============
+showKeyPrompt(function(ok)
+    if ok then
+        createMenu()
+        print("[GARUDA AIM v3] KEY VALID — Menu loaded. Korban aman.")
+    end
+end)
