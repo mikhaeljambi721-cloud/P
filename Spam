@@ -1,0 +1,260 @@
+-- wshadow_wa.lua
+-- delta executor — whatsapp spammer with menu
+
+local CONFIG_PATH = "/sdcard/wshadow_wa.cfg"
+
+-- ==== default config ====
+local cfg = {
+    message      = "hey",
+    contacts     = { "Mom" },
+    delay_ms     = 1500,
+    repeat_count = 10,
+    mode         = "list",   -- "list" or "single"
+    single_target= "",
+}
+
+-- ==== coordinate anchors — TUNE FOR YOUR DEVICE ====
+local C = {
+    search_bar   = {x = 540,  y = 220},
+    first_result = {x = 540,  y = 380},
+    msg_field    = {x = 540,  y = 1780},
+    send_button  = {x = 1000, y = 1780},
+    back_button  = {x = 60,   y = 120},
+}
+
+-- ==== state ====
+local running   = false
+local stop_flag = false
+local sent      = 0
+
+-- ==== low level ====
+local function sleep(ms) gg.sleep(ms) end
+
+local function tap(x, y, dur)
+    dur = dur or 50
+    gg.touchDown(0, x, y)
+    gg.sleep(dur)
+    gg.touchUp(0, x, y)
+    gg.sleep(80)
+end
+
+local function typeText(str)
+    for i = 1, #str do
+        local ch = str:sub(i, i)
+        if gg.typeText then
+            gg.typeText(ch)
+        elseif gg.type then
+            gg.type(ch)
+        else
+            gg.keyPress(string.byte(ch))
+        end
+        gg.sleep(40)
+    end
+end
+
+local function clearField()
+    gg.keyDown("ctrl"); gg.keyPress("a"); gg.keyUp("ctrl")
+    gg.sleep(50)
+    gg.keyPress("del")
+    gg.sleep(80)
+end
+
+local function launchWA()
+    local ok = gg.launchApp("com.whatsapp")
+    sleep(3000)
+    return ok
+end
+
+-- ==== actions ====
+local function sendOne(target, msg)
+    if stop_flag then return false end
+
+    -- search
+    tap(C.search_bar.x, C.search_bar.y); sleep(500)
+    clearField()
+    typeText(target)
+    sleep(1500)
+
+    -- open
+    tap(C.first_result.x, C.first_result.y); sleep(1500)
+
+    -- type msg
+    tap(C.msg_field.x, C.msg_field.y); sleep(400)
+    typeText(msg)
+    sleep(300)
+
+    -- send
+    tap(C.send_button.x, C.send_button.y); sleep(600)
+
+    -- back
+    tap(C.back_button.x, C.back_button.y); sleep(1200)
+
+    sent = sent + 1
+    return true
+end
+
+local function runSpam()
+    if running then return end
+    running = true
+    stop_flag = false
+
+    print("[*] spam start — " .. cfg.repeat_count .. "x")
+    if not launchWA() then
+        print("[!] launch failed")
+        running = false
+        return
+    end
+
+    local targets
+    if cfg.mode == "single" and cfg.single_target ~= "" then
+        targets = { cfg.single_target }
+    else
+        targets = cfg.contacts
+    end
+
+    for r = 1, cfg.repeat_count do
+        if stop_flag then break end
+        for _, t in ipairs(targets) do
+            if stop_flag then break end
+            print(string.format("[%d/%d] -> %s", r, cfg.repeat_count, t))
+            sendOne(t, cfg.message)
+            sleep(cfg.delay_ms)
+        end
+    end
+
+    print("[+] done — sent: " .. sent)
+    running = false
+end
+
+local function stopSpam()
+    stop_flag = true
+    print("[!] stop signal sent")
+end
+
+-- ==== config persistence ====
+local function saveCfg()
+    local f = io.open(CONFIG_PATH, "w")
+    if not f then return end
+    local lines = {
+        "message=" .. cfg.message,
+        "delay_ms=" .. cfg.delay_ms,
+        "repeat_count=" .. cfg.repeat_count,
+        "mode=" .. cfg.mode,
+        "single_target=" .. cfg.single_target,
+        "contacts=" .. table.concat(cfg.contacts, "|"),
+    }
+    f:write(table.concat(lines, "\n"))
+    f:close()
+    print("[+] config saved")
+end
+
+local function loadCfg()
+    local f = io.open(CONFIG_PATH, "r")
+    if not f then return end
+    for line in f:lines() do
+        local k, v = line:match("^(.-)=(.*)$")
+        if k == "message"       then cfg.message = v
+        elseif k == "delay_ms"  then cfg.delay_ms = tonumber(v) or cfg.delay_ms
+        elseif k == "repeat_count" then cfg.repeat_count = tonumber(v) or cfg.repeat_count
+        elseif k == "mode"      then cfg.mode = v
+        elseif k == "single_target" then cfg.single_target = v
+        elseif k == "contacts"  then
+            cfg.contacts = {}
+            for c in v:gmatch("[^|]+") do table.insert(cfg.contacts, c) end
+        end
+    end
+    f:close()
+    print("[+] config loaded")
+end
+
+-- ==== menu ====
+local function prompt(title, default)
+    return gg.prompt({ title }, { tostring(default or "") }, { "text" })[1]
+end
+
+local function editMessage()
+    local v = prompt("Message to spam:", cfg.message)
+    if v and v ~= "" then cfg.message = v end
+end
+
+local function editDelay()
+    local v = prompt("Delay between sends (ms):", cfg.delay_ms)
+    local n = tonumber(v)
+    if n then cfg.delay_ms = n end
+end
+
+local function editRepeat()
+    local v = prompt("Repeat count:", cfg.repeat_count)
+    local n = tonumber(v)
+    if n then cfg.repeat_count = n end
+end
+
+local function editSingle()
+    local v = prompt("Single target name:", cfg.single_target)
+    if v then cfg.single_target = v end
+    cfg.mode = "single"
+end
+
+local function editContacts()
+    local v = prompt("Contacts (comma-separated):", table.concat(cfg.contacts, ","))
+    if v then
+        cfg.contacts = {}
+        for c in v:gmatch("[^,]+") do
+            table.insert(cfg.contacts, c:gsub("^%s+", ""):gsub("%s+$", ""))
+        end
+        cfg.mode = "list"
+    end
+end
+
+local function showStatus()
+    local s = string.format(
+        "message: %s\ndelay: %d ms\nrepeat: %d\nmode: %s\ncontacts: %s\nsent: %d\nrunning: %s",
+        cfg.message, cfg.delay_ms, cfg.repeat_count, cfg.mode,
+        table.concat(cfg.contacts, ", "), sent, tostring(running)
+    )
+    gg.alert(s, "ok")
+end
+
+local function showMenu()
+    local choice = gg.choice({
+        "1. run spam",
+        "2. stop spam",
+        "3. edit message",
+        "4. edit delay",
+        "5. edit repeat count",
+        "6. edit contacts (list mode)",
+        "7. set single target",
+        "8. save config",
+        "9. load config",
+        "10. status",
+        "0. exit",
+    }, nil, "wshadow wa spam")
+
+    if choice == nil then return end
+
+    if choice == 1 then runSpam()
+    elseif choice == 2 then stopSpam()
+    elseif choice == 3 then editMessage()
+    elseif choice == 4 then editDelay()
+    elseif choice == 5 then editRepeat()
+    elseif choice == 6 then editContacts()
+    elseif choice == 7 then editSingle()
+    elseif choice == 8 then saveCfg()
+    elseif choice == 9 then loadCfg()
+    elseif choice == 10 then showStatus()
+    elseif choice == 11 then return
+    end
+
+    showMenu()
+end
+
+-- ==== floating button hook (if delta build exposes it) ====
+if gg.showButton then
+    gg.showButton("wa-spam", function()
+        showMenu()
+    end)
+else
+    -- no floating button -> just open menu
+    loadCfg()
+    showMenu()
+end
