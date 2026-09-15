@@ -1,0 +1,649 @@
+--[[
+    AIM BOT SART 1.2
+    Delta Executor
+    Key: MIKAEL GANTENG1 (1 jam), VIP (100 hari)
+    Jangan kasih tau key nya ke orang lain.
+]]
+
+local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+-- ============ KEY SYSTEM ============
+local keyFile = "aimbot_sart_key.txt"
+
+local function getKeyExpiry()
+    if isfile and isfile(keyFile) then
+        local ok, data = pcall(readfile, keyFile)
+        if ok then
+            local expiry = tonumber(data)
+            if expiry then return expiry end
+        end
+    end
+    return 0
+end
+
+local function saveKeyExpiry(expiry)
+    if writefile then
+        pcall(writefile, keyFile, tostring(expiry))
+    end
+end
+
+local function checkKey(key)
+    if key == "MIKAEL GANTENG1" then
+        return os.time() + 3600 -- 1 jam
+    elseif key == "VIP" then
+        return os.time() + 8640000 -- 100 hari
+    end
+    return nil
+end
+
+local currentExpiry = getKeyExpiry()
+local keyValid = os.time() <= currentExpiry
+
+if not keyValid then
+    local KeyWindow = Rayfield:CreateWindow({
+        Name = "AIM BOT SART 1.2 - Key",
+        LoadingTitle = "Verifikasi Key",
+        LoadingSubtitle = "Masukkan key",
+        ConfigurationSaving = {Enabled = false},
+        Discord = {Enabled = false},
+        KeySystem = false
+    })
+
+    local KeyTab = KeyWindow:CreateTab("Key", 4483362458)
+    local keyInput = ""
+    KeyTab:CreateInput({
+        Name = "Key",
+        PlaceholderText = "Masukkan key di sini...",
+        RemoveTextAfterFocusLost = false,
+        Callback = function(text)
+            keyInput = text
+        end
+    })
+
+    KeyTab:CreateButton({
+        Name = "Submit",
+        Callback = function()
+            local expiry = checkKey(keyInput)
+            if expiry then
+                saveKeyExpiry(expiry)
+                Rayfield:Notify({
+                    Title = "Berhasil",
+                    Content = "Key valid! Silakan reload script.",
+                    Duration = 5
+                })
+                KeyWindow:Destroy()
+            else
+                Rayfield:Notify({
+                    Title = "Gagal",
+                    Content = "Key salah atau kadaluarsa.",
+                    Duration = 5
+                })
+            end
+        end
+    })
+
+    return
+end
+
+-- ============ MAIN GUI ============
+local Window = Rayfield:CreateWindow({
+    Name = "AIM BOT SART 1.2",
+    LoadingTitle = "AIM BOT SART",
+    LoadingSubtitle = "by ENI",
+    ConfigurationSaving = {Enabled = false},
+    Discord = {Enabled = false},
+    KeySystem = false
+})
+
+-- ============ VARIABEL ============
+local aimbotEnabled = false
+local aimbotFOV = 150
+local aimbotSmoothness = 0.15
+local aimbotTargetPart = "Head"
+local aimbotTeamCheck = true
+local aimbotWallCheck = false
+local aimbotAutoShoot = false
+
+local espEnabled = false
+local espBox = true
+local espName = true
+local espHealth = true
+local espDistance = true
+local espTracers = false
+
+local flyEnabled = false
+local flySpeed = 50
+local noclipEnabled = false
+local speedEnabled = false
+local speedValue = 16
+local jumpEnabled = false
+local jumpValue = 50
+
+local aiEnabled = false
+local aiPrediction = 0.15
+
+-- ============ FUNGSI AIMBOT ============
+local function getClosestPlayer()
+    local closest = nil
+    local shortest = aimbotFOV
+    local mousePos = UserInputService:GetMouseLocation()
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player == LocalPlayer then continue end
+        if aimbotTeamCheck and player.Team == LocalPlayer.Team then continue end
+        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then continue end
+        if not player.Character:FindFirstChild("Humanoid") or player.Character.Humanoid.Health <= 0 then continue end
+
+        local part = player.Character:FindFirstChild(aimbotTargetPart) or player.Character.HumanoidRootPart
+        local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+        if not onScreen then continue end
+
+        local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+        if dist < shortest then
+            if aimbotWallCheck then
+                local ray = Ray.new(Camera.CFrame.Position, part.Position - Camera.CFrame.Position)
+                local hit = workspace:FindPartOnRay(ray, LocalPlayer.Character)
+                if hit and not hit:IsDescendantOf(player.Character) then continue end
+            end
+            shortest = dist
+            closest = player
+        end
+    end
+    return closest
+end
+
+local function aimAt(target)
+    if not target or not target.Character then return end
+    local part = target.Character:FindFirstChild(aimbotTargetPart) or target.Character.HumanoidRootPart
+    if not part then return end
+
+    local targetPos = part.Position
+    if aiEnabled and aiPrediction > 0 then
+        local hrp = target.Character.HumanoidRootPart
+        if hrp then
+            targetPos = targetPos + hrp.Velocity * aiPrediction
+        end
+    end
+
+    local newCFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+    Camera.CFrame = Camera.CFrame:Lerp(newCFrame, aimbotSmoothness)
+end
+
+local function autoShoot()
+    if not aimbotAutoShoot then return end
+    local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+    if tool then
+        tool:Activate()
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if aimbotEnabled then
+        local target = getClosestPlayer()
+        if target then
+            aimAt(target)
+            autoShoot()
+        end
+    end
+end)
+
+-- ============ FUNGSI ESP ============
+local espObjects = {}
+
+local function createESP(player)
+    if player == LocalPlayer then return end
+    if espObjects[player] then return end
+
+    local esp = {}
+    local character = player.Character
+    if not character then return end
+
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    if espBox then
+        local box = Instance.new("BoxHandleAdornment")
+        box.Size = Vector3.new(4, 6, 4)
+        box.Adornee = root
+        box.AlwaysOnTop = true
+        box.ZIndex = 5
+        box.Transparency = 0.5
+        box.Color3 = Color3.fromRGB(255, 0, 0)
+        box.Parent = root
+        esp.box = box
+    end
+
+    if espName then
+        local billboard = Instance.new("BillboardGui")
+        billboard.Size = UDim2.new(0, 200, 0, 50)
+        billboard.StudsOffset = Vector3.new(0, 3, 0)
+        billboard.AlwaysOnTop = true
+        billboard.Parent = root
+
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = player.Name
+        nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        nameLabel.TextStrokeTransparency = 0
+        nameLabel.Parent = billboard
+        esp.name = billboard
+    end
+
+    if espHealth then
+        local healthBillboard = Instance.new("BillboardGui")
+        healthBillboard.Size = UDim2.new(0, 100, 0, 20)
+        healthBillboard.StudsOffset = Vector3.new(0, -1, 0)
+        healthBillboard.AlwaysOnTop = true
+        healthBillboard.Parent = root
+
+        local healthBar = Instance.new("Frame")
+        healthBar.Size = UDim2.new(1, 0, 1, 0)
+        healthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+        healthBar.Parent = healthBillboard
+        esp.health = healthBillboard
+    end
+
+    if espDistance then
+        local distBillboard = Instance.new("BillboardGui")
+        distBillboard.Size = UDim2.new(0, 100, 0, 20)
+        distBillboard.StudsOffset = Vector3.new(0, -2, 0)
+        distBillboard.AlwaysOnTop = true
+        distBillboard.Parent = root
+
+        local distLabel = Instance.new("TextLabel")
+        distLabel.Size = UDim2.new(1, 0, 1, 0)
+        distLabel.BackgroundTransparency = 1
+        distLabel.Text = "0"
+        distLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+        distLabel.TextStrokeTransparency = 0
+        distLabel.Parent = distBillboard
+        esp.dist = distBillboard
+    end
+
+    espObjects[player] = esp
+end
+
+local function removeESP(player)
+    local esp = espObjects[player]
+    if esp then
+        for _, obj in pairs(esp) do
+            if obj and obj.Destroy then obj:Destroy() end
+        end
+        espObjects[player] = nil
+    end
+end
+
+local function updateESP()
+    for player, esp in pairs(espObjects) do
+        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+            removeESP(player)
+            continue
+        end
+        local root = player.Character.HumanoidRootPart
+        if esp.box then esp.box.Adornee = root end
+        if esp.name then esp.name.Adornee = root end
+        if esp.health then
+            esp.health.Adornee = root
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            if humanoid and esp.health:FindFirstChildOfClass("Frame") then
+                local ratio = humanoid.Health / humanoid.MaxHealth
+                esp.health.Frame.Size = UDim2.new(ratio, 0, 1, 0)
+                esp.health.Frame.BackgroundColor3 = Color3.fromRGB(255 * (1 - ratio), 255 * ratio, 0)
+            end
+        end
+        if esp.dist then
+            esp.dist.Adornee = root
+            local dist = (Camera.CFrame.Position - root.Position).Magnitude
+            local label = esp.dist:FindFirstChildOfClass("TextLabel")
+            if label then label.Text = string.format("%d m", math.floor(dist)) end
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if espEnabled then
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                if not espObjects[player] then
+                    createESP(player)
+                end
+            end
+        end
+        updateESP()
+    else
+        for player, _ in pairs(espObjects) do
+            removeESP(player)
+        end
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    removeESP(player)
+end)
+
+-- ============ FUNGSI FLY ============
+local flyBV = nil
+local flyBG = nil
+
+local function enableFly()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    flyBV = Instance.new("BodyVelocity")
+    flyBV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    flyBV.Velocity = Vector3.zero
+    flyBV.Parent = hrp
+
+    flyBG = Instance.new("BodyGyro")
+    flyBG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    flyBG.P = 9e4
+    flyBG.Parent = hrp
+end
+
+local function disableFly()
+    if flyBV then flyBV:Destroy() flyBV = nil end
+    if flyBG then flyBG:Destroy() flyBG = nil end
+end
+
+RunService.RenderStepped:Connect(function()
+    if flyEnabled and flyBV and flyBG then
+        local moveDir = Vector3.zero
+        local camCF = Camera.CFrame
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + camCF.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - camCF.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - camCF.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + camCF.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir = moveDir - Vector3.new(0, 1, 0) end
+
+        if moveDir.Magnitude > 0 then
+            flyBV.Velocity = moveDir.Unit * flySpeed
+        else
+            flyBV.Velocity = Vector3.zero
+        end
+        flyBG.CFrame = camCF
+    end
+end)
+
+-- ============ FUNGSI NOCLIP ============
+local noclipConnection
+local function enableNoclip()
+    noclipConnection = RunService.Stepped:Connect(function()
+        if LocalPlayer.Character then
+            for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end)
+end
+
+local function disableNoclip()
+    if noclipConnection then
+        noclipConnection:Disconnect()
+        noclipConnection = nil
+    end
+end
+
+-- ============ FUNGSI SPEED & JUMP ============
+local function updateSpeed()
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.WalkSpeed = speedEnabled and speedValue or 16
+    end
+end
+
+local function updateJump()
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.JumpPower = jumpEnabled and jumpValue or 50
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    updateSpeed()
+    updateJump()
+    if flyEnabled then enableFly() end
+end)
+
+-- ============ GUI TABS ============
+local AimbotTab = Window:CreateTab("Aimbot", 4483362458)
+local ESPTab = Window:CreateTab("ESP", 4483362458)
+local MoveTab = Window:CreateTab("Movement", 4483362458)
+local AITab = Window:CreateTab("AI", 4483362458)
+
+-- Aimbot Tab
+AimbotTab:CreateToggle({
+    Name = "Aimbot",
+    CurrentValue = false,
+    Flag = "AimbotToggle",
+    Callback = function(value)
+        aimbotEnabled = value
+    end
+})
+
+AimbotTab:CreateSlider({
+    Name = "FOV",
+    Range = {0, 500},
+    Increment = 1,
+    Suffix = "px",
+    CurrentValue = 150,
+    Flag = "AimbotFOV",
+    Callback = function(value)
+        aimbotFOV = value
+    end
+})
+
+AimbotTab:CreateSlider({
+    Name = "Smoothness",
+    Range = {0.01, 1},
+    Increment = 0.01,
+    Suffix = "",
+    CurrentValue = 0.15,
+    Flag = "AimbotSmooth",
+    Callback = function(value)
+        aimbotSmoothness = value
+    end
+})
+
+AimbotTab:CreateDropdown({
+    Name = "Target Part",
+    Options = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"},
+    CurrentOption = {"Head"},
+    Flag = "AimbotPart",
+    Callback = function(option)
+        aimbotTargetPart = option[1]
+    end
+})
+
+AimbotTab:CreateToggle({
+    Name = "Team Check",
+    CurrentValue = true,
+    Flag = "TeamCheck",
+    Callback = function(value)
+        aimbotTeamCheck = value
+    end
+})
+
+AimbotTab:CreateToggle({
+    Name = "Wall Check",
+    CurrentValue = false,
+    Flag = "WallCheck",
+    Callback = function(value)
+        aimbotWallCheck = value
+    end
+})
+
+AimbotTab:CreateToggle({
+    Name = "Auto Shoot",
+    CurrentValue = false,
+    Flag = "AutoShoot",
+    Callback = function(value)
+        aimbotAutoShoot = value
+    end
+})
+
+-- ESP Tab
+ESPTab:CreateToggle({
+    Name = "ESP",
+    CurrentValue = false,
+    Flag = "ESPToggle",
+    Callback = function(value)
+        espEnabled = value
+    end
+})
+
+ESPTab:CreateToggle({
+    Name = "Box",
+    CurrentValue = true,
+    Flag = "ESPBox",
+    Callback = function(value)
+        espBox = value
+    end
+})
+
+ESPTab:CreateToggle({
+    Name = "Name",
+    CurrentValue = true,
+    Flag = "ESPName",
+    Callback = function(value)
+        espName = value
+    end
+})
+
+ESPTab:CreateToggle({
+    Name = "Health",
+    CurrentValue = true,
+    Flag = "ESPHealth",
+    Callback = function(value)
+        espHealth = value
+    end
+})
+
+ESPTab:CreateToggle({
+    Name = "Distance",
+    CurrentValue = true,
+    Flag = "ESPDistance",
+    Callback = function(value)
+        espDistance = value
+    end
+})
+
+-- Movement Tab
+MoveTab:CreateToggle({
+    Name = "Fly",
+    CurrentValue = false,
+    Flag = "FlyToggle",
+    Callback = function(value)
+        flyEnabled = value
+        if value then enableFly() else disableFly() end
+    end
+})
+
+MoveTab:CreateSlider({
+    Name = "Fly Speed",
+    Range = {10, 200},
+    Increment = 1,
+    Suffix = "studs/s",
+    CurrentValue = 50,
+    Flag = "FlySpeed",
+    Callback = function(value)
+        flySpeed = value
+    end
+})
+
+MoveTab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Flag = "NoclipToggle",
+    Callback = function(value)
+        noclipEnabled = value
+        if value then enableNoclip() else disableNoclip() end
+    end
+})
+
+MoveTab:CreateToggle({
+    Name = "Speed",
+    CurrentValue = false,
+    Flag = "SpeedToggle",
+    Callback = function(value)
+        speedEnabled = value
+        updateSpeed()
+    end
+})
+
+MoveTab:CreateSlider({
+    Name = "Speed Value",
+    Range = {16, 200},
+    Increment = 1,
+    Suffix = "studs",
+    CurrentValue = 16,
+    Flag = "SpeedValue",
+    Callback = function(value)
+        speedValue = value
+        updateSpeed()
+    end
+})
+
+MoveTab:CreateToggle({
+    Name = "Jump Power",
+    CurrentValue = false,
+    Flag = "JumpToggle",
+    Callback = function(value)
+        jumpEnabled = value
+        updateJump()
+    end
+})
+
+MoveTab:CreateSlider({
+    Name = "Jump Value",
+    Range = {50, 500},
+    Increment = 1,
+    Suffix = "",
+    CurrentValue = 50,
+    Flag = "JumpValue",
+    Callback = function(value)
+        jumpValue = value
+        updateJump()
+    end
+})
+
+-- AI Tab
+AITab:CreateToggle({
+    Name = "AI Auto-Aim",
+    CurrentValue = false,
+    Flag = "AIToggle",
+    Callback = function(value)
+        aiEnabled = value
+    end
+})
+
+AITab:CreateSlider({
+    Name = "AI Prediction",
+    Range = {0, 0.5},
+    Increment = 0.01,
+    Suffix = "s",
+    CurrentValue = 0.15,
+    Flag = "AIPrediction",
+    Callback = function(value)
+        aiPrediction = value
+    end
+})
+
+-- Notifikasi
+Rayfield:Notify({
+    Title = "AIM BOT SART 1.2",
+    Content = "Script berhasil dimuat. Selamat bermain!",
+    Duration = 5
+})
