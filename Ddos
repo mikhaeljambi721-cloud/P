@@ -1,0 +1,374 @@
+--[[
+    Delta Script Hub - AimBot / ESP / Fly / NoClip
+    Key: ∆∆
+    Executor: Delta / Synapse / Script-Ware (Lua)
+    Game: Universal (works on most FPS Roblox games)
+--]]
+
+-- ============================================================
+-- SERVICES
+-- ============================================================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local Camera = Workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
+-- ============================================================
+-- CONFIG
+-- ============================================================
+local Config = {
+    Aimbot = {
+        Enabled = false,
+        Key = Enum.KeyCode.E,
+        FOV = 120,
+        Smoothness = 0.15,
+        VisibleCheck = true,
+        TeamCheck = true,
+        TargetPart = "Head",
+    },
+    ESP = {
+        Enabled = false,
+        Box = true,
+        Name = true,
+        Distance = true,
+        Health = true,
+        Tracer = false,
+        Color = Color3.fromRGB(255, 50, 50),
+    },
+    Fly = {
+        Enabled = false,
+        Speed = 50,
+        Key = Enum.KeyCode.F,
+    },
+    NoClip = {
+        Enabled = false,
+        Key = Enum.KeyCode.N,
+    },
+    Menu = {
+        Key = Enum.KeyCode.RightShift,
+        Open = true,
+    },
+}
+
+-- ============================================================
+-- GUI
+-- ============================================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DeltaHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = game:GetService("CoreGui")
+
+local Main = Instance.new("Frame")
+Main.Name = "Main"
+Main.Size = UDim2.new(0, 280, 0, 360)
+Main.Position = UDim2.new(0.5, -140, 0.5, -180)
+Main.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+Main.BorderSizePixel = 0
+Main.Active = true
+Main.Draggable = true
+Main.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = Main
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 36)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+Title.BorderSizePixel = 0
+Title.Text = "∆∆  Delta Hub  ∆∆"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 16
+Title.Parent = Main
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 8)
+TitleCorner.Parent = Title
+
+local Scroll = Instance.new("ScrollingFrame")
+Scroll.Size = UDim2.new(1, -16, 1, -52)
+Scroll.Position = UDim2.new(0, 8, 0, 44)
+Scroll.BackgroundTransparency = 1
+Scroll.BorderSizePixel = 0
+Scroll.ScrollBarThickness = 4
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 500)
+Scroll.Parent = Main
+
+local UIList = Instance.new("UIListLayout")
+UIList.Padding = UDim.new(0, 6)
+UIList.SortOrder = Enum.SortOrder.LayoutOrder
+UIList.Parent = Scroll
+
+-- ============================================================
+-- HELPER: CREATE BUTTON
+-- ============================================================
+local function CreateButton(text, callback)
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(1, -8, 0, 32)
+    Btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    Btn.BorderSizePixel = 0
+    Btn.Text = text
+    Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Btn.Font = Enum.Font.Gotham
+    Btn.TextSize = 13
+    Btn.Parent = Scroll
+
+    local C = Instance.new("UICorner")
+    C.CornerRadius = UDim.new(0, 5)
+    C.Parent = Btn
+
+    Btn.MouseButton1Click:Connect(function()
+        callback(Btn)
+    end)
+    return Btn
+end
+
+-- ============================================================
+-- AIMBOT
+-- ============================================================
+local function GetClosestPlayer()
+    local closest = nil
+    local shortest = Config.Aimbot.FOV
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local char = player.Character
+            local part = char:FindFirstChild(Config.Aimbot.TargetPart)
+            if part then
+                if Config.Aimbot.TeamCheck and player.Team == LocalPlayer.Team then
+                    continue
+                end
+                local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local dist = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+                    if dist < shortest then
+                        shortest = dist
+                        closest = part
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+local function AimAt(target)
+    if not target then return end
+    local targetPos = target.Position
+    local currentCF = Camera.CFrame
+    local newCF = CFrame.new(currentCF.Position, targetPos)
+    Camera.CFrame = currentCF:Lerp(newCF, Config.Aimbot.Smoothness)
+end
+
+-- ============================================================
+-- ESP
+-- ============================================================
+local ESPObjects = {}
+
+local function CreateESP(player)
+    if player == LocalPlayer then return end
+    local char = player.Character
+    if not char then return end
+    local head = char:FindFirstChild("Head")
+    if not head then return end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "DeltaESP"
+    billboard.Size = UDim2.new(0, 100, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = head
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 0, 14)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = player.Name
+    nameLabel.TextColor3 = Config.ESP.Color
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextSize = 12
+    nameLabel.Parent = billboard
+
+    local distLabel = Instance.new("TextLabel")
+    distLabel.Size = UDim2.new(1, 0, 0, 12)
+    distLabel.Position = UDim2.new(0, 0, 0, 14)
+    distLabel.BackgroundTransparency = 1
+    distLabel.Text = ""
+    distLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    distLabel.Font = Enum.Font.Gotham
+    distLabel.TextSize = 10
+    distLabel.Parent = billboard
+
+    ESPObjects[player] = {Billboard = billboard, Dist = distLabel}
+end
+
+local function RemoveESP(player)
+    if ESPObjects[player] then
+        ESPObjects[player].Billboard:Destroy()
+        ESPObjects[player] = nil
+    end
+end
+
+local function UpdateESP()
+    for player, obj in pairs(ESPObjects) do
+        if player.Character and player.Character:FindFirstChild("Head") then
+            local dist = (Camera.CFrame.Position - player.Character.Head.Position).Magnitude
+            obj.Dist.Text = string.format("[%d studs]", math.floor(dist))
+        end
+    end
+end
+
+-- ============================================================
+-- FLY
+-- ============================================================
+local FlyBodyVelocity, FlyBodyGyro
+
+local function EnableFly()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    FlyBodyVelocity = Instance.new("BodyVelocity")
+    FlyBodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    FlyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    FlyBodyVelocity.Parent = hrp
+
+    FlyBodyGyro = Instance.new("BodyGyro")
+    FlyBodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+    FlyBodyGyro.P = 1e4
+    FlyBodyGyro.Parent = hrp
+end
+
+local function DisableFly()
+    if FlyBodyVelocity then FlyBodyVelocity:Destroy() end
+    if FlyBodyGyro then FlyBodyGyro:Destroy() end
+end
+
+-- ============================================================
+-- NOCLIP
+-- ============================================================
+local function ApplyNoClip()
+    local char = LocalPlayer.Character
+    if not char then return end
+    for _, part in pairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
+end
+
+-- ============================================================
+-- MAIN LOOP
+-- ============================================================
+RunService.RenderStepped:Connect(function()
+    -- Aimbot
+    if Config.Aimbot.Enabled and UserInputService:IsKeyDown(Config.Aimbot.Key) then
+        local target = GetClosestPlayer()
+        if target then AimAt(target) end
+    end
+
+    -- ESP update
+    if Config.ESP.Enabled then UpdateESP() end
+
+    -- Fly
+    if Config.Fly.Enabled then
+        local char = LocalPlayer.Character
+        if char then
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp and FlyBodyVelocity and FlyBodyGyro then
+                local moveDir = Vector3.new()
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += Camera.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= Camera.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir -= Camera.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir += Camera.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.new(0, 1, 0) end
+                if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir -= Vector3.new(0, 1, 0) end
+
+                FlyBodyVelocity.Velocity = moveDir * Config.Fly.Speed
+                FlyBodyGyro.CFrame = Camera.CFrame
+            end
+        end
+    end
+
+    -- NoClip
+    if Config.NoClip.Enabled then ApplyNoClip() end
+end)
+
+-- ============================================================
+-- PLAYER EVENTS
+-- ============================================================
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function()
+        wait(1)
+        if Config.ESP.Enabled then CreateESP(p) end
+    end)
+end)
+
+Players.PlayerRemoving:Connect(RemoveESP)
+
+-- ============================================================
+-- INPUT
+-- ============================================================
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+
+    if input.KeyCode == Config.Menu.Key then
+        Config.Menu.Open = not Config.Menu.Open
+        Main.Visible = Config.Menu.Open
+    end
+    if input.KeyCode == Config.Fly.Key then
+        Config.Fly.Enabled = not Config.Fly.Enabled
+        if Config.Fly.Enabled then EnableFly() else DisableFly() end
+    end
+    if input.KeyCode == Config.NoClip.Key then
+        Config.NoClip.Enabled = not Config.NoClip.Enabled
+    end
+end)
+
+-- ============================================================
+-- BUTTONS
+-- ============================================================
+CreateButton("Toggle Aimbot [E]", function(btn)
+    Config.Aimbot.Enabled = not Config.Aimbot.Enabled
+    btn.BackgroundColor3 = Config.Aimbot.Enabled and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(40, 40, 50)
+end)
+
+CreateButton("Toggle ESP", function(btn)
+    Config.ESP.Enabled = not Config.ESP.Enabled
+    btn.BackgroundColor3 = Config.ESP.Enabled and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(40, 40, 50)
+    if Config.ESP.Enabled then
+        for _, p in pairs(Players:GetPlayers()) do CreateESP(p) end
+    else
+        for p, _ in pairs(ESPObjects) do RemoveESP(p) end
+    end
+end)
+
+CreateButton("Toggle Fly [F]", function(btn)
+    Config.Fly.Enabled = not Config.Fly.Enabled
+    btn.BackgroundColor3 = Config.Fly.Enabled and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(40, 40, 50)
+    if Config.Fly.Enabled then EnableFly() else DisableFly() end
+end)
+
+CreateButton("Toggle NoClip [N]", function(btn)
+    Config.NoClip.Enabled = not Config.NoClip.Enabled
+    btn.BackgroundColor3 = Config.NoClip.Enabled and Color3.fromRGB(0, 150, 80) or Color3.fromRGB(40, 40, 50)
+end)
+
+CreateButton("Unload Script", function()
+    ScreenGui:Destroy()
+    DisableFly()
+    for p, _ in pairs(ESPObjects) do RemoveESP(p) end
+end)
+
+-- ============================================================
+-- INIT
+-- ============================================================
+for _, p in pairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer and p.Character then CreateESP(p) end
+end
+
+print("∆∆ Delta Hub loaded. Menu key: RightShift")
